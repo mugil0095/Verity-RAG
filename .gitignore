@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+*.egg
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+
+# Raw downloaded dataset (4.7MB) -- data/build_corpus.py re-fetches it.
+# The smaller derived files (corpus.json, eval_answerable.json,
+# eval_unanswerable.json) ARE committed for reproducibility without a
+# network fetch.
+data/squad_dev.json
+
+# OS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/

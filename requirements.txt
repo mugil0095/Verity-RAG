@@ -1,0 +1,11 @@
+numpy
+scipy
+scikit-learn
+rank_bm25
+lightgbm
+fastapi
+uvicorn[standard]
+pytest
+pytest-asyncio
+pydantic
+httpx

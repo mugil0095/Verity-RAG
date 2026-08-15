@@ -1,0 +1,93 @@
+"""
+FastAPI service exposing the pipeline in real time.
+
+  POST /ingest   -> add a document to the live index immediately
+  POST /query    -> run the agent controller and return a grounded answer
+                     (or an explicit abstention) + full trace for observability
+  GET  /health   -> liveness probe
+  GET  /stats    -> index size, reranker status -- what you'd wire to a
+                     dashboard in production
+"""
+from __future__ import annotations
+
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+from .pipeline import VerityRAGPipeline
+
+app = FastAPI(title="VerityRAG", version="0.1.0")
+pipeline = VerityRAGPipeline()
+
+
+class IngestRequest(BaseModel):
+    doc_id: str
+    title: str
+    text: str
+
+
+class QueryRequest(BaseModel):
+    question: str
+
+
+class ClaimOut(BaseModel):
+    claim: str
+    semantic_support: float
+    lexical_support: float
+    is_grounded: bool
+
+
+class QueryResponse(BaseModel):
+    question: str
+    answer: str | None
+    abstained: bool
+    grounding_score: float | None
+    verdict: str | None
+    claims: list[ClaimOut]
+    evidence_chunk_ids: list[str]
+    hops_used: int
+
+
+@app.post("/ingest")
+def ingest(req: IngestRequest):
+    n_chunks = pipeline.ingest_document(req.doc_id, req.title, req.text)
+    return {"doc_id": req.doc_id, "chunks_added": n_chunks, "index_size": pipeline.index.size()}
+
+
+@app.post("/query", response_model=QueryResponse)
+def query(req: QueryRequest):
+    result = pipeline.query(req.question)
+    claims = []
+    grounding_score = None
+    verdict = None
+    if result.grounding is not None:
+        grounding_score = result.grounding.overall_score
+        verdict = result.grounding.verdict
+        claims = [
+            ClaimOut(claim=c.claim, semantic_support=c.semantic_support,
+                      lexical_support=c.lexical_support, is_grounded=c.is_grounded)
+            for c in result.grounding.claims
+        ]
+    return QueryResponse(
+        question=result.query,
+        answer=result.answer,
+        abstained=result.abstained,
+        grounding_score=grounding_score,
+        verdict=verdict,
+        claims=claims,
+        evidence_chunk_ids=[e.chunk_id for e in result.evidence],
+        hops_used=result.hops_used,
+    )
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "index_size": pipeline.index.size()}
+
+
+@app.get("/stats")
+def stats():
+    return {
+        "index_size": pipeline.index.size(),
+        "reranker_trained": pipeline._reranker_model is not None,
+        "index_updates_count": pipeline.index.updates_count,
+    }

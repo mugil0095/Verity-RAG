@@ -1,0 +1,902 @@
+[
+  {
+    "question": "When did BSkyB announce it's intention to replace it's free-to-air digital channels?",
+    "gold_answer": "8 February 2007",
+    "source_doc_id": "d496",
+    "source_title": "Sky_(United_Kingdom)"
+  },
+  {
+    "question": "Despite being traditionall described as \"eight counties\", how many counties does this region actually have?",
+    "gold_answer": "10 counties",
+    "source_doc_id": "d444",
+    "source_title": "Southern_California"
+  },
+  {
+    "question": "What field of computer science analyzes the resource requirements of a specific algorithm isolated unto itself within a given problem?",
+    "gold_answer": "analysis of algorithms",
+    "source_doc_id": "d242",
+    "source_title": "Computational_complexity_theory"
+  },
+  {
+    "question": "When did the Pope warned Luther of excommunication? ",
+    "gold_answer": "15 June 1520",
+    "source_doc_id": "d370",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "What is the original meaning of the word Norman?",
+    "gold_answer": "Viking",
+    "source_doc_id": "d105",
+    "source_title": "Normans"
+  },
+  {
+    "question": "Where in South Carolina did Huguenot nobility settle?",
+    "gold_answer": "the Charleston Orange district",
+    "source_doc_id": "d536",
+    "source_title": "Huguenot"
+  },
+  {
+    "question": "In contrast how were Catholic saints portrayed?",
+    "gold_answer": "frail Catholic saints",
+    "source_doc_id": "d442",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "Who lost to the Broncos in the divisional round?",
+    "gold_answer": "Pittsburgh Steelers",
+    "source_doc_id": "d16",
+    "source_title": "Super_Bowl_50"
+  },
+  {
+    "question": "What countries is corporal punishment still a normal practice?",
+    "gold_answer": "some Asian, African and Caribbean countries",
+    "source_doc_id": "d306",
+    "source_title": "Teacher"
+  },
+  {
+    "question": "What do counties sometimes offer to get more teachers?",
+    "gold_answer": "alternative licensing programs",
+    "source_doc_id": "d334",
+    "source_title": "Teacher"
+  },
+  {
+    "question": "What is the largest city in all of California?",
+    "gold_answer": "Los Angeles",
+    "source_doc_id": "d467",
+    "source_title": "Southern_California"
+  },
+  {
+    "question": "Who said, \"Here I stand. I can do no other\"?",
+    "gold_answer": "Luther",
+    "source_doc_id": "d374",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "Who went to Wittenberg to hear Luther speak?",
+    "gold_answer": "Students",
+    "source_doc_id": "d363",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "Who did Tesla work for in the 1880s?",
+    "gold_answer": "Thomas Edison",
+    "source_doc_id": "d149",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "What did Luther get implicated in concerning Philip I?",
+    "gold_answer": "bigamy",
+    "source_doc_id": "d425",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "Where can a lot Tesla's writings be found?",
+    "gold_answer": "the web",
+    "source_doc_id": "d237",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "At what speed did the turbine operate?",
+    "gold_answer": "16,000 rpm",
+    "source_doc_id": "d196",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "Where did Huguenots and Walloons settle in England?",
+    "gold_answer": "Canterbury",
+    "source_doc_id": "d545",
+    "source_title": "Huguenot"
+  },
+  {
+    "question": "To whom did Luther send a letter containing his 95 Theses?",
+    "gold_answer": "Archbishop Albrecht",
+    "source_doc_id": "d367",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "What country did the Normans invade in 1169?",
+    "gold_answer": "Ireland",
+    "source_doc_id": "d125",
+    "source_title": "Normans"
+  },
+  {
+    "question": "What did Tesla think could improve the brain's intelligence?",
+    "gold_answer": "application of electricity",
+    "source_doc_id": "d198",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "When was his article published in Century Magazine?",
+    "gold_answer": "1900",
+    "source_doc_id": "d237",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "Despite the Presburger problem, and in view of intractability, what has been done to establish solutions in reasonable periods of time?",
+    "gold_answer": "algorithms have been written",
+    "source_doc_id": "d282",
+    "source_title": "Computational_complexity_theory"
+  },
+  {
+    "question": "What marine engines were less efficient than steam turbines?",
+    "gold_answer": "reciprocating steam engines",
+    "source_doc_id": "d596",
+    "source_title": "Steam_engine"
+  },
+  {
+    "question": "Who handled play-by-play for the Denver radio market?",
+    "gold_answer": "Dave Logan",
+    "source_doc_id": "d40",
+    "source_title": "Super_Bowl_50"
+  },
+  {
+    "question": "On what date was Victoria declared independent from New South Wales?",
+    "gold_answer": "1 July 1851",
+    "source_doc_id": "d521",
+    "source_title": "Victoria_(Australia)"
+  },
+  {
+    "question": "What is the start of the salary year?",
+    "gold_answer": "April 2008",
+    "source_doc_id": "d336",
+    "source_title": "Teacher"
+  },
+  {
+    "question": "What is a common punishment in the UK and Ireland?",
+    "gold_answer": "detention",
+    "source_doc_id": "d307",
+    "source_title": "Teacher"
+  },
+  {
+    "question": "When is Luther commemorated in the Lutheran Calendar of Saints ?",
+    "gold_answer": "18 February",
+    "source_doc_id": "d443",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "What is the unproven assumption generally ascribed to the value of complexity classes?",
+    "gold_answer": "suspected to be unequal",
+    "source_doc_id": "d278",
+    "source_title": "Computational_complexity_theory"
+  },
+  {
+    "question": "What are public schools in Victoria?",
+    "gold_answer": "state or government",
+    "source_doc_id": "d515",
+    "source_title": "Victoria_(Australia)"
+  },
+  {
+    "question": "How many ways did Luther justify his opposition to revolt?",
+    "gold_answer": "on three grounds",
+    "source_doc_id": "d386",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "In the effort of maintaining a level of abstraction, what choice is typically left independent?",
+    "gold_answer": "encoding",
+    "source_doc_id": "d286",
+    "source_title": "Computational_complexity_theory"
+  },
+  {
+    "question": "How many electorates does the State of Victoria have?",
+    "gold_answer": "eight",
+    "source_doc_id": "d507",
+    "source_title": "Victoria_(Australia)"
+  },
+  {
+    "question": "What archdiocese is Warsaw the seat of?",
+    "gold_answer": "Roman Catholic",
+    "source_doc_id": "d74",
+    "source_title": "Warsaw"
+  },
+  {
+    "question": "When have Lutheran Churches repudiated Luther's statements about the Jews?",
+    "gold_answer": "Since the 1980s",
+    "source_doc_id": "d434",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "How far did he claim the mechanical energy could be transmitted?",
+    "gold_answer": "over any terrestrial distance",
+    "source_doc_id": "d206",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "what did tesla attribute skin damage to?",
+    "gold_answer": "damage to the skin was not caused by the Roentgen rays, but by the ozone generated in contact with the skin",
+    "source_doc_id": "d179",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "What were the first two destinations of Huguenot emigres?",
+    "gold_answer": "Switzerland and the Netherlands",
+    "source_doc_id": "d550",
+    "source_title": "Huguenot"
+  },
+  {
+    "question": "What did Philip I wish to do around 1539?",
+    "gold_answer": "wanted to marry",
+    "source_doc_id": "d425",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "Sky Movies and Sky Box office also include what optional soundtracks?",
+    "gold_answer": "Dolby Digital",
+    "source_doc_id": "d493",
+    "source_title": "Sky_(United_Kingdom)"
+  },
+  {
+    "question": "What is another general name for a religious teacher?",
+    "gold_answer": "spiritual",
+    "source_doc_id": "d291",
+    "source_title": "Teacher"
+  },
+  {
+    "question": "Whose saying about freeing souls from purgatory was often quoted?",
+    "gold_answer": "Tetzel",
+    "source_doc_id": "d360",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "It is generally assumed that a Turing machine can solve anything capable of also being solved using what?",
+    "gold_answer": "an algorithm",
+    "source_doc_id": "d252",
+    "source_title": "Computational_complexity_theory"
+  },
+  {
+    "question": "What was a major success, especially in rebuilding Warsaw?",
+    "gold_answer": "Three-Year Plan",
+    "source_doc_id": "d60",
+    "source_title": "Warsaw"
+  },
+  {
+    "question": "What do government's run that affects teachers?",
+    "gold_answer": "teacher's colleges",
+    "source_doc_id": "d294",
+    "source_title": "Teacher"
+  },
+  {
+    "question": "Where was Luther mostly concentrating his efforts on reform?",
+    "gold_answer": "Electorate of Saxony",
+    "source_doc_id": "d393",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "What did Luther form in 1525 to 1529?",
+    "gold_answer": "supervisory church body",
+    "source_doc_id": "d392",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "What percentage was the increase of agricultural products in 2003-04?",
+    "gold_answer": "17%",
+    "source_doc_id": "d528",
+    "source_title": "Victoria_(Australia)"
+  },
+  {
+    "question": "Which network broadcast the game in Spanish?",
+    "gold_answer": "ESPN Deportes",
+    "source_doc_id": "d33",
+    "source_title": "Super_Bowl_50"
+  },
+  {
+    "question": "Where did Luther say that the soul doesn't sleep, but rather has visions?",
+    "gold_answer": "Commentary on Genesis",
+    "source_doc_id": "d413",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "Who wants a more confrontational type of discipline?",
+    "gold_answer": "some teachers and parents",
+    "source_doc_id": "d309",
+    "source_title": "Teacher"
+  },
+  {
+    "question": "Who does BSkyB have an operating license from?",
+    "gold_answer": "Ofcom",
+    "source_doc_id": "d499",
+    "source_title": "Sky_(United_Kingdom)"
+  },
+  {
+    "question": "When did Luther enter into the senate of the Theology faculty of the University of Wittenberg?",
+    "gold_answer": "21 October 1512",
+    "source_doc_id": "d355",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "Who was a prominent Huguenot in Holland?",
+    "gold_answer": "Pierre Bayle",
+    "source_doc_id": "d570",
+    "source_title": "Huguenot"
+  },
+  {
+    "question": "Where did Tesla and Twain hang out?",
+    "gold_answer": "lab",
+    "source_doc_id": "d226",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "What signer of the Articles of Confederation was descended from Huguenots?",
+    "gold_answer": "Henry Laurens",
+    "source_doc_id": "d552",
+    "source_title": "Huguenot"
+  },
+  {
+    "question": "What did Tesla begin to research in March 1896?",
+    "gold_answer": "X-ray imaging",
+    "source_doc_id": "d178",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "What kind of economy does Victoria have?",
+    "gold_answer": "diversified",
+    "source_doc_id": "d505",
+    "source_title": "Victoria_(Australia)"
+  },
+  {
+    "question": "Who was the War of Currents waged between? ",
+    "gold_answer": "Thomas Edison and George Westinghouse",
+    "source_doc_id": "d171",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "What paper is commonly considered the bellwether ushering in systematic studies computational complexity?",
+    "gold_answer": "On the Computational Complexity of Algorithms",
+    "source_doc_id": "d284",
+    "source_title": "Computational_complexity_theory"
+  },
+  {
+    "question": "when did tesla begin researching x-ray imaging?",
+    "gold_answer": "March 1896",
+    "source_doc_id": "d178",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "In what year was Nikola Tesla born? ",
+    "gold_answer": "1856",
+    "source_doc_id": "d148",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "When did the church reform begin?",
+    "gold_answer": "early 11th century",
+    "source_doc_id": "d142",
+    "source_title": "Normans"
+  },
+  {
+    "question": "On what did Tesla blame for the loss of the initial money?",
+    "gold_answer": "Panic of 1901",
+    "source_doc_id": "d194",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "Who was Tesla influenced by while in school?",
+    "gold_answer": "Martin Sekuli\u0107",
+    "source_doc_id": "d154",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "Who did Luther think was behind the antinomian theses circulating in Wittenberg?",
+    "gold_answer": "Johannes Agricola",
+    "source_doc_id": "d421",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "From what French King did the Huguenot name possibly descend?",
+    "gold_answer": "Hugues Capet",
+    "source_doc_id": "d564",
+    "source_title": "Huguenot"
+  },
+  {
+    "question": "When did Luther write the hymn From Depths of Woe I cry to You?",
+    "gold_answer": "1523",
+    "source_doc_id": "d406",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "How many total touchdowns did Cam Newton score?",
+    "gold_answer": "45",
+    "source_doc_id": "d10",
+    "source_title": "Super_Bowl_50"
+  },
+  {
+    "question": "In addition to schools, where else is popularly based authority effective?",
+    "gold_answer": "governments",
+    "source_doc_id": "d312",
+    "source_title": "Teacher"
+  },
+  {
+    "question": "What increases student's motivation to learn?",
+    "gold_answer": "teacher enthusiasm",
+    "source_doc_id": "d314",
+    "source_title": "Teacher"
+  },
+  {
+    "question": "What was the name given to the regions in which the pro - slavery southerners lived?",
+    "gold_answer": "Cow Counties",
+    "source_doc_id": "d455",
+    "source_title": "Southern_California"
+  },
+  {
+    "question": "How much money is being spent on other Super Bowl-related events?",
+    "gold_answer": "$2 million",
+    "source_doc_id": "d27",
+    "source_title": "Super_Bowl_50"
+  },
+  {
+    "question": "What is the foundation for separation results within complexity classes?",
+    "gold_answer": "time and space hierarchy theorems",
+    "source_doc_id": "d268",
+    "source_title": "Computational_complexity_theory"
+  },
+  {
+    "question": "When did he talk about his thoughts on gender?",
+    "gold_answer": "1926",
+    "source_doc_id": "d232",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "Who could be the subjects of a teacher's college investigation?",
+    "gold_answer": "members",
+    "source_doc_id": "d295",
+    "source_title": "Teacher"
+  },
+  {
+    "question": "Does the new deal include Video on demand and High Definition?",
+    "gold_answer": "no",
+    "source_doc_id": "d504",
+    "source_title": "Sky_(United_Kingdom)"
+  },
+  {
+    "question": "Where was Tesla's property sent?",
+    "gold_answer": "Belgrade",
+    "source_doc_id": "d215",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "How many seats does Victoria have in the Senate?",
+    "gold_answer": "12",
+    "source_doc_id": "d520",
+    "source_title": "Victoria_(Australia)"
+  },
+  {
+    "question": "What campaign did the Communist regime initiate after WWII?",
+    "gold_answer": "\"Bricks for Warsaw\"",
+    "source_doc_id": "d82",
+    "source_title": "Warsaw"
+  },
+  {
+    "question": "When was the Duchy of Normandy founded?",
+    "gold_answer": "911",
+    "source_doc_id": "d106",
+    "source_title": "Normans"
+  },
+  {
+    "question": "What is the name of the water body that is found to the east?",
+    "gold_answer": "Colorado River",
+    "source_doc_id": "d447",
+    "source_title": "Southern_California"
+  },
+  {
+    "question": "In what expression can one expect to find DTIME(n)",
+    "gold_answer": "DTIME(n2)",
+    "source_doc_id": "d267",
+    "source_title": "Computational_complexity_theory"
+  },
+  {
+    "question": "What caused Luther to write hymns?",
+    "gold_answer": "events in his life",
+    "source_doc_id": "d403",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "What year saw the earliest recorded use of the steam engine indicator?",
+    "gold_answer": "1851",
+    "source_doc_id": "d586",
+    "source_title": "Steam_engine"
+  },
+  {
+    "question": "Of what nationality was Martin Luther?",
+    "gold_answer": "German",
+    "source_doc_id": "d346",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "Which coastline does Southern California touch?",
+    "gold_answer": "Pacific",
+    "source_doc_id": "d446",
+    "source_title": "Southern_California"
+  },
+  {
+    "question": "Who did the churches claim had suggested expulsion of Jews from Germany?",
+    "gold_answer": "Luther",
+    "source_doc_id": "d430",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "What is the weather type of Mallee and upper Wimmera?",
+    "gold_answer": "warmest regions",
+    "source_doc_id": "d514",
+    "source_title": "Victoria_(Australia)"
+  },
+  {
+    "question": "When was Martin Luther ordained as a priest?",
+    "gold_answer": "1507",
+    "source_doc_id": "d354",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "Who bought the rights?",
+    "gold_answer": "Enrique P\u00e9rez de Guzm\u00e1n",
+    "source_doc_id": "d138",
+    "source_title": "Normans"
+  },
+  {
+    "question": "When did building activity occur on St. Kazimierz Church?",
+    "gold_answer": "1688\u20131692",
+    "source_doc_id": "d89",
+    "source_title": "Warsaw"
+  },
+  {
+    "question": "What is generally considered to be the most basic iteration of a Turing machine?",
+    "gold_answer": "A deterministic Turing machine",
+    "source_doc_id": "d253",
+    "source_title": "Computational_complexity_theory"
+  },
+  {
+    "question": "Which team was suspended from the MLS?",
+    "gold_answer": "Chivas USA",
+    "source_doc_id": "d480",
+    "source_title": "Southern_California"
+  },
+  {
+    "question": "Where has there been very well-known cases of teacher misconduct?",
+    "gold_answer": "United States",
+    "source_doc_id": "d321",
+    "source_title": "Teacher"
+  },
+  {
+    "question": "What were the origins of the Raouliii family?",
+    "gold_answer": "Norman mercenary",
+    "source_doc_id": "d117",
+    "source_title": "Normans"
+  },
+  {
+    "question": "What was the ultimate development of the horizontal engine?",
+    "gold_answer": "Corliss steam engine",
+    "source_doc_id": "d613",
+    "source_title": "Steam_engine"
+  },
+  {
+    "question": "In what areas does most of the learning take place?",
+    "gold_answer": "self-study and problem solving",
+    "source_doc_id": "d299",
+    "source_title": "Teacher"
+  },
+  {
+    "question": "With whom must someone who wants to teach register?",
+    "gold_answer": "the General Teaching Council for Scotland (GTCS)",
+    "source_doc_id": "d335",
+    "source_title": "Teacher"
+  },
+  {
+    "question": "Whic Carolina Panthers running back was waived?",
+    "gold_answer": "DeAngelo Williams",
+    "source_doc_id": "d9",
+    "source_title": "Super_Bowl_50"
+  },
+  {
+    "question": "What did Luther need to do to avoid excommunication? ",
+    "gold_answer": "recanted 41 sentences",
+    "source_doc_id": "d370",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "What disease did Tesla contract in 1873?",
+    "gold_answer": "cholera",
+    "source_doc_id": "d155",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "What type of authority do Sudbury schools prefer?",
+    "gold_answer": "popularly based authority",
+    "source_doc_id": "d312",
+    "source_title": "Teacher"
+  },
+  {
+    "question": "Who reported on the sideline for ESPN Deportes?",
+    "gold_answer": "John Sutcliffe",
+    "source_doc_id": "d33",
+    "source_title": "Super_Bowl_50"
+  },
+  {
+    "question": "How many first downs did Denver have?",
+    "gold_answer": "11",
+    "source_doc_id": "d53",
+    "source_title": "Super_Bowl_50"
+  },
+  {
+    "question": "On what day was Super Bowl Opening Night held?",
+    "gold_answer": "Monday",
+    "source_doc_id": "d28",
+    "source_title": "Super_Bowl_50"
+  },
+  {
+    "question": "When were the two finalists for hosting Super Bowl 50 announced?",
+    "gold_answer": "October 16, 2012",
+    "source_doc_id": "d6",
+    "source_title": "Super_Bowl_50"
+  },
+  {
+    "question": "The analysis of a specific algorithm is typically assigned to what field of computational science?",
+    "gold_answer": "analysis of algorithms",
+    "source_doc_id": "d261",
+    "source_title": "Computational_complexity_theory"
+  },
+  {
+    "question": "What proclamation abolished protestantism in France?",
+    "gold_answer": "Edict of Fontainebleau",
+    "source_doc_id": "d538",
+    "source_title": "Huguenot"
+  },
+  {
+    "question": "How do some scholars view the Nazi use of Luther's work?",
+    "gold_answer": "opportunistic",
+    "source_doc_id": "d431",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "What landmark was Tesla asked about in regards to electricity in 1893?",
+    "gold_answer": "Niagara Falls",
+    "source_doc_id": "d173",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "Who was the Super Bowl 50 MVP?",
+    "gold_answer": "Von Miller",
+    "source_doc_id": "d2",
+    "source_title": "Super_Bowl_50"
+  },
+  {
+    "question": "After Huguenots fled France, their last remaining bastion was where?",
+    "gold_answer": "C\u00e9vennes",
+    "source_doc_id": "d555",
+    "source_title": "Huguenot"
+  },
+  {
+    "question": "Who was the chief executive officer when the service began?",
+    "gold_answer": "Sam Chisholm",
+    "source_doc_id": "d490",
+    "source_title": "Sky_(United_Kingdom)"
+  },
+  {
+    "question": "What are engines using four expansion stages known as?",
+    "gold_answer": "quadruple expansion engines",
+    "source_doc_id": "d578",
+    "source_title": "Steam_engine"
+  },
+  {
+    "question": "Who was Guy's Rival?",
+    "gold_answer": "Conrad of Montferrat",
+    "source_doc_id": "d134",
+    "source_title": "Normans"
+  },
+  {
+    "question": "What was Nikola Tesla's ethnicity?",
+    "gold_answer": "Serbian",
+    "source_doc_id": "d148",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "Where might a teacher teach that is not inside a building?",
+    "gold_answer": "outdoors",
+    "source_doc_id": "d296",
+    "source_title": "Teacher"
+  },
+  {
+    "question": "What was the first Super Bowl branded with Roman numerals?",
+    "gold_answer": "Super Bowl V",
+    "source_doc_id": "d24",
+    "source_title": "Super_Bowl_50"
+  },
+  {
+    "question": "When was the FSO Car Factory founded?",
+    "gold_answer": "1951",
+    "source_doc_id": "d101",
+    "source_title": "Warsaw"
+  },
+  {
+    "question": "What paved the way for the Augsburg Confession?",
+    "gold_answer": "Marburg Colloquy",
+    "source_doc_id": "d416",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "Other than many sunny days, what characteristic is typical for the climate in souther California?",
+    "gold_answer": "infrequent rain",
+    "source_doc_id": "d460",
+    "source_title": "Southern_California"
+  },
+  {
+    "question": "How many students have received unwanted sexual attention from a teacher or other education figure?",
+    "gold_answer": "9.6%",
+    "source_doc_id": "d319",
+    "source_title": "Teacher"
+  },
+  {
+    "question": "In what year were Tesla's motor and transformer designs licensed to Westinghouse?",
+    "gold_answer": "1888",
+    "source_doc_id": "d169",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "In organizing a new church, what did Luther find to be unworkable for congregations?",
+    "gold_answer": "choosing their own ministers",
+    "source_doc_id": "d392",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "What other compensation did Tesla get from Westinghouse?",
+    "gold_answer": "rent at the Hotel New Yorker",
+    "source_doc_id": "d205",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "Which Florida venue was one of three considered for Super Bowl 50?",
+    "gold_answer": "Miami's Sun Life Stadium",
+    "source_doc_id": "d5",
+    "source_title": "Super_Bowl_50"
+  },
+  {
+    "question": "In what type of work was Luther prolific?",
+    "gold_answer": "authoring hymns",
+    "source_doc_id": "d402",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "What service did BSkyB chare additional subscription fees for?",
+    "gold_answer": "Sky+ PVR",
+    "source_doc_id": "d486",
+    "source_title": "Sky_(United_Kingdom)"
+  },
+  {
+    "question": "When did Tesla begin working for the Continental Edison Company?",
+    "gold_answer": "1882",
+    "source_doc_id": "d162",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "What is the name associated with the eight areas that make up a part of southern California?",
+    "gold_answer": "Metropolitan Statistical Areas",
+    "source_doc_id": "d466",
+    "source_title": "Southern_California"
+  },
+  {
+    "question": "What was Luther's force within the Reformation?",
+    "gold_answer": "conservative",
+    "source_doc_id": "d383",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "Who upon arriving gave the original viking settlers a common identity?",
+    "gold_answer": "Rollo",
+    "source_doc_id": "d107",
+    "source_title": "Normans"
+  },
+  {
+    "question": "When was Warsaw's first stock exchange established?",
+    "gold_answer": "1817",
+    "source_doc_id": "d100",
+    "source_title": "Warsaw"
+  },
+  {
+    "question": "How did the new king react to the Huguenots?",
+    "gold_answer": "acted increasingly aggressively to force the Huguenots to convert",
+    "source_doc_id": "d567",
+    "source_title": "Huguenot"
+  },
+  {
+    "question": "What two member nations of the Holy Roman Empire received Huguenot refugees?",
+    "gold_answer": "Electorate of Brandenburg and Electorate of the Palatinate",
+    "source_doc_id": "d563",
+    "source_title": "Huguenot"
+  },
+  {
+    "question": "What year did Tesla enroll at an engineering school?",
+    "gold_answer": "1875",
+    "source_doc_id": "d157",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "What subatomic particle did Tesla deny the existence of?",
+    "gold_answer": "electron",
+    "source_doc_id": "d228",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "Reduction essentially takes one problem and converts into what?",
+    "gold_answer": "another problem",
+    "source_doc_id": "d269",
+    "source_title": "Computational_complexity_theory"
+  },
+  {
+    "question": "What book did Luther read in 1542?",
+    "gold_answer": "Qur'an",
+    "source_doc_id": "d420",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "What story of little truth is a pillar of history?",
+    "gold_answer": "posting on the door",
+    "source_doc_id": "d361",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "Who were the current rights holders for the Primer League?",
+    "gold_answer": "ITV",
+    "source_doc_id": "d498",
+    "source_title": "Sky_(United_Kingdom)"
+  },
+  {
+    "question": "When did Luther introduce the new worship?",
+    "gold_answer": "1527",
+    "source_doc_id": "d395",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "What is Norman art's most well known piece?",
+    "gold_answer": "Bayeux Tapestry",
+    "source_doc_id": "d144",
+    "source_title": "Normans"
+  },
+  {
+    "question": "What language were classes held in at Tesla's school?",
+    "gold_answer": "German",
+    "source_doc_id": "d154",
+    "source_title": "Nikola_Tesla"
+  },
+  {
+    "question": "What is the basic unit of territorial division in Poland?",
+    "gold_answer": "a commune",
+    "source_doc_id": "d96",
+    "source_title": "Warsaw"
+  },
+  {
+    "question": "What did Johannes Agricola preach that God's gospel revealed?",
+    "gold_answer": "God's wrath to Christians",
+    "source_doc_id": "d421",
+    "source_title": "Martin_Luther"
+  },
+  {
+    "question": "What did Lady Gaga sing?",
+    "gold_answer": "the national anthem",
+    "source_doc_id": "d43",
+    "source_title": "Super_Bowl_50"
+  },
+  {
+    "question": "When did Martin Luther publish his translation of the New Testament?",
+    "gold_answer": "1522",
+    "source_doc_id": "d399",
+    "source_title": "Martin_Luther"
+  }
+]

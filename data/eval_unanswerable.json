@@ -1,0 +1,602 @@
+[
+  {
+    "question": "A forced trade agreement between two countries would be an example of what?",
+    "excluded_topic": "Imperialism"
+  },
+  {
+    "question": "What effect did the plague have on the Middle East?",
+    "excluded_topic": "Black_Death"
+  },
+  {
+    "question": "What are private schools that charge no tuition called?",
+    "excluded_topic": "Private_school"
+  },
+  {
+    "question": "What are Ctenophora commonly known as?",
+    "excluded_topic": "Ctenophora"
+  },
+  {
+    "question": "Newcastle served as a northern fortress for which country during the Middle Ages?",
+    "excluded_topic": "Newcastle_upon_Tyne"
+  },
+  {
+    "question": "Whose First Law of Motion says that unless acted upon be forces, objects would continue to move at a constant velocity?",
+    "excluded_topic": "Force"
+  },
+  {
+    "question": "Who started the IPCC Trust Fund?",
+    "excluded_topic": "Intergovernmental_Panel_on_Climate_Change"
+  },
+  {
+    "question": "Soon after gaining Florida, what did the English do?",
+    "excluded_topic": "Jacksonville,_Florida"
+  },
+  {
+    "question": "What do some believe about this pronunciation?",
+    "excluded_topic": "Kenya"
+  },
+  {
+    "question": "Where do Ctenophora live?",
+    "excluded_topic": "Ctenophora"
+  },
+  {
+    "question": "Who was the V&A's first director?",
+    "excluded_topic": "Victoria_and_Albert_Museum"
+  },
+  {
+    "question": "How many chloroplast lineages are there?",
+    "excluded_topic": "Chloroplast"
+  },
+  {
+    "question": "What is the delta in the Rhine delimited in the west by?",
+    "excluded_topic": "Rhine"
+  },
+  {
+    "question": "What planet is Doctor Who from?",
+    "excluded_topic": "Doctor_Who"
+  },
+  {
+    "question": "In what year did ABC stylize it's logo as abc?",
+    "excluded_topic": "American_Broadcasting_Company"
+  },
+  {
+    "question": "Who recorded \"Walking in Fresno?\"",
+    "excluded_topic": "Fresno,_California"
+  },
+  {
+    "question": "In what year was the school formed?",
+    "excluded_topic": "Harvard_University"
+  },
+  {
+    "question": "What organization arranged to founding of school?",
+    "excluded_topic": "Harvard_University"
+  },
+  {
+    "question": "What is Pedanius Dioscorides known for?",
+    "excluded_topic": "Pharmacy"
+  },
+  {
+    "question": "Pneumatica was written by what Greek writer?",
+    "excluded_topic": "Oxygen"
+  },
+  {
+    "question": "Who normally manages a construction job?",
+    "excluded_topic": "Construction"
+  },
+  {
+    "question": "What was the first spacecraft to orbit another celestial body?",
+    "excluded_topic": "Apollo_program"
+  },
+  {
+    "question": "What person helped establish the school with a donation?",
+    "excluded_topic": "University_of_Chicago"
+  },
+  {
+    "question": "Near Chur, which direction does the Rhine turn? ",
+    "excluded_topic": "Rhine"
+  },
+  {
+    "question": "Who donated property to the University of Chicago?",
+    "excluded_topic": "University_of_Chicago"
+  },
+  {
+    "question": "Where does the name Rhine derive from? ",
+    "excluded_topic": "Rhine"
+  },
+  {
+    "question": "Who fought in the French and Indian war?",
+    "excluded_topic": "French_and_Indian_War"
+  },
+  {
+    "question": "Photosynthesis uses which energy to for oxygen from water?",
+    "excluded_topic": "Oxygen"
+  },
+  {
+    "question": "What was developed for the Air Force ",
+    "excluded_topic": "Packet_switching"
+  },
+  {
+    "question": "Who were Tem\u00fcjin's three full brothers?",
+    "excluded_topic": "Genghis_Khan"
+  },
+  {
+    "question": "What does 'plastid' mean?",
+    "excluded_topic": "Chloroplast"
+  },
+  {
+    "question": "Developments in which scientists influenced the creation of pharmacology in medieval Islam?",
+    "excluded_topic": "Pharmacy"
+  },
+  {
+    "question": "where is the Victoria and Albert Museum located?",
+    "excluded_topic": "Victoria_and_Albert_Museum"
+  },
+  {
+    "question": "Who did the keelmen live with in a tight-knight community east of Newcastle?",
+    "excluded_topic": "Newcastle_upon_Tyne"
+  },
+  {
+    "question": "How many hundred of years was Scotland directly governed by the parliament of Great Britain?",
+    "excluded_topic": "Scottish_Parliament"
+  },
+  {
+    "question": "What typically involves mass production of similar items without a designated purchaser?",
+    "excluded_topic": "Construction"
+  },
+  {
+    "question": "What are the two primary constitutional sources of the European Union?",
+    "excluded_topic": "European_Union_law"
+  },
+  {
+    "question": "What is an example of major civil disobedience in South Africa?",
+    "excluded_topic": "Civil_disobedience"
+  },
+  {
+    "question": "What is the size of the school's endowment?",
+    "excluded_topic": "Harvard_University"
+  },
+  {
+    "question": "What did Distributed Adaptive Message Block Switching do",
+    "excluded_topic": "Packet_switching"
+  },
+  {
+    "question": "What does it mean for a disease to be enzootic?",
+    "excluded_topic": "Black_Death"
+  },
+  {
+    "question": "What is the conventional method to measure the Rhine? ",
+    "excluded_topic": "Rhine"
+  },
+  {
+    "question": "What has the tendency to increase wages in a field or job position?",
+    "excluded_topic": "Economic_inequality"
+  },
+  {
+    "question": "Which country was the last to receive the disease?",
+    "excluded_topic": "Black_Death"
+  },
+  {
+    "question": "What is the Latin name for Black Death?",
+    "excluded_topic": "Black_Death"
+  },
+  {
+    "question": "In which point did the drainage basin of the Amazon split?",
+    "excluded_topic": "Amazon_rainforest"
+  },
+  {
+    "question": "Who did Genghis Khan unite before he began conquering the rest of Eurasia?",
+    "excluded_topic": "Genghis_Khan"
+  },
+  {
+    "question": "For what nation did Ribault initially claim what is now Jacksonville?",
+    "excluded_topic": "Jacksonville,_Florida"
+  },
+  {
+    "question": "Along with Muslims, Jews and Protestant Christians, what religious group notably operates private schools?",
+    "excluded_topic": "Private_school"
+  },
+  {
+    "question": "Oxygen is released in cellular respiration by?",
+    "excluded_topic": "Oxygen"
+  },
+  {
+    "question": "Who discovered pottery found on Black Hammock Island?",
+    "excluded_topic": "Jacksonville,_Florida"
+  },
+  {
+    "question": "What is Engineering News-Record?",
+    "excluded_topic": "Construction"
+  },
+  {
+    "question": "Who proved that air is necessary for combustion?",
+    "excluded_topic": "Oxygen"
+  },
+  {
+    "question": "In what years did Doctor Who originally show on TV?",
+    "excluded_topic": "Doctor_Who"
+  },
+  {
+    "question": "What has allowed for the Savanna region to expand into the tropics?",
+    "excluded_topic": "Amazon_rainforest"
+  },
+  {
+    "question": "Which treaty provides that the European Union law be applied to metropolitan territories of member states?",
+    "excluded_topic": "European_Union_law"
+  },
+  {
+    "question": "How many affiliated stations does ABC currently have?",
+    "excluded_topic": "American_Broadcasting_Company"
+  },
+  {
+    "question": "What dynasty came before the Yuan?",
+    "excluded_topic": "Yuan_dynasty"
+  },
+  {
+    "question": "When did ABC first start?",
+    "excluded_topic": "American_Broadcasting_Company"
+  },
+  {
+    "question": "What is circuit switching characterized by",
+    "excluded_topic": "Packet_switching"
+  },
+  {
+    "question": "Which two treaties provided more formal institutions of the European Union?",
+    "excluded_topic": "European_Union_law"
+  },
+  {
+    "question": "What did Davies call his system ",
+    "excluded_topic": "Packet_switching"
+  },
+  {
+    "question": "How were the men who did tasks like those of today's pharmacists viewed in Japan in the Asuka and Nara periods?",
+    "excluded_topic": "Pharmacy"
+  },
+  {
+    "question": "What UN organizations established the IPCC?",
+    "excluded_topic": "Intergovernmental_Panel_on_Climate_Change"
+  },
+  {
+    "question": "What publication printed that the wealthiest 1% have more money than those in the bottom 90%?",
+    "excluded_topic": "Economic_inequality"
+  },
+  {
+    "question": "How is packet mode communication implemented ",
+    "excluded_topic": "Packet_switching"
+  },
+  {
+    "question": "In the range between 1980 and 1990, what did demand for grow?",
+    "excluded_topic": "Scottish_Parliament"
+  },
+  {
+    "question": "What new product did Bank of America introduce in 1958?",
+    "excluded_topic": "Fresno,_California"
+  },
+  {
+    "question": "Who oversees a Pharmacy Technician in the UK?",
+    "excluded_topic": "Pharmacy"
+  },
+  {
+    "question": "What types of waves do seismologists use to image the interior of the Earth?",
+    "excluded_topic": "Geology"
+  },
+  {
+    "question": "What individual is the school named after?",
+    "excluded_topic": "Harvard_University"
+  },
+  {
+    "question": "Along with the Anglican Church and Uniting Church, what religious denomination operates private schools in Australia?",
+    "excluded_topic": "Private_school"
+  },
+  {
+    "question": "What do we call the empire that Genghis Khan founded?",
+    "excluded_topic": "Genghis_Khan"
+  },
+  {
+    "question": "What person argues that civil disobedience is used to describe everything?",
+    "excluded_topic": "Civil_disobedience"
+  },
+  {
+    "question": "What has partical physics made to describe sub-atomic forces?",
+    "excluded_topic": "Force"
+  },
+  {
+    "question": "How did war start?",
+    "excluded_topic": "French_and_Indian_War"
+  },
+  {
+    "question": "The atomic number of the periodic table for oxygen?",
+    "excluded_topic": "Oxygen"
+  },
+  {
+    "question": "Who granted Newcastle a new charter in 1589?",
+    "excluded_topic": "Newcastle_upon_Tyne"
+  },
+  {
+    "question": "What does the IPCC not do?",
+    "excluded_topic": "Intergovernmental_Panel_on_Climate_Change"
+  },
+  {
+    "question": "What path does a ball thrown up and down in a moving vehicle take when seen by an outside observer? ",
+    "excluded_topic": "Force"
+  },
+  {
+    "question": "In what year did the Apollo 1 cabin fire occur?",
+    "excluded_topic": "Apollo_program"
+  },
+  {
+    "question": "What English chemist showed that fire only needed nitoaereus?",
+    "excluded_topic": "Oxygen"
+  },
+  {
+    "question": "What act set out the Parliament's powers as a devolved legislature?",
+    "excluded_topic": "Scottish_Parliament"
+  },
+  {
+    "question": "When did Genghis Khan become Great Khan?",
+    "excluded_topic": "Yuan_dynasty"
+  },
+  {
+    "question": "What is the yearly cost of some notable prep schools in New England?",
+    "excluded_topic": "Private_school"
+  },
+  {
+    "question": "What year did Doctor Who first show on TV?",
+    "excluded_topic": "Doctor_Who"
+  },
+  {
+    "question": "Who helped develop the first man-made self-sustaining nuclear reaction?",
+    "excluded_topic": "University_of_Chicago"
+  },
+  {
+    "question": "What power is available to Australian private schools but generally not present in public schools?",
+    "excluded_topic": "Private_school"
+  },
+  {
+    "question": "Le Grande also wrote that defining the term civil disobedience so difficult it could be described as? ",
+    "excluded_topic": "Civil_disobedience"
+  },
+  {
+    "question": "How did the principle treaties that form the European Union begin?",
+    "excluded_topic": "European_Union_law"
+  },
+  {
+    "question": "Why did the European nations and Japan separated themselves from United States during the crisis?",
+    "excluded_topic": "1973_oil_crisis"
+  },
+  {
+    "question": "What is it called when people in society rebel against laws they think are unfair?",
+    "excluded_topic": "Civil_disobedience"
+  },
+  {
+    "question": "Who was Genghis Khan's father?",
+    "excluded_topic": "Genghis_Khan"
+  },
+  {
+    "question": "Who did the army siege belong to?",
+    "excluded_topic": "Black_Death"
+  },
+  {
+    "question": "What is another term for year 12 of education?",
+    "excluded_topic": "Private_school"
+  },
+  {
+    "question": "Who introduced plague to Europe?",
+    "excluded_topic": "Black_Death"
+  },
+  {
+    "question": "Who mapped the St. Johns River in 1562?",
+    "excluded_topic": "Jacksonville,_Florida"
+  },
+  {
+    "question": "What type of climate does Kenya have?",
+    "excluded_topic": "Kenya"
+  },
+  {
+    "question": "Under what law is value of a worker determined?",
+    "excluded_topic": "Economic_inequality"
+  },
+  {
+    "question": "Who increased British military resources in colonies?",
+    "excluded_topic": "French_and_Indian_War"
+  },
+  {
+    "question": "When was the University of Chicago established?",
+    "excluded_topic": "University_of_Chicago"
+  },
+  {
+    "question": "In what year was the Apollo program announced?",
+    "excluded_topic": "Apollo_program"
+  },
+  {
+    "question": "In which two codes were the roles of pharmacists codified?",
+    "excluded_topic": "Pharmacy"
+  },
+  {
+    "question": "What river runs alongside Jacksonville?",
+    "excluded_topic": "Jacksonville,_Florida"
+  },
+  {
+    "question": "What company owns the American Broadcasting Company?",
+    "excluded_topic": "American_Broadcasting_Company"
+  },
+  {
+    "question": "The V&A has its origins in which world exposition? ",
+    "excluded_topic": "Victoria_and_Albert_Museum"
+  },
+  {
+    "question": "Where did the black death originate?",
+    "excluded_topic": "Black_Death"
+  },
+  {
+    "question": "What principle relates to the formation of faults and the age of the sequences through which they cut? ",
+    "excluded_topic": "Geology"
+  },
+  {
+    "question": "What is the name of the property that designates a number as being prime or not?",
+    "excluded_topic": "Prime_number"
+  },
+  {
+    "question": "What is the name of the supposition that any number larger than 2 can be represented as the sum of two primes?",
+    "excluded_topic": "Prime_number"
+  },
+  {
+    "question": "What ethnicity was Shi Tianze?",
+    "excluded_topic": "Yuan_dynasty"
+  },
+  {
+    "question": "In 1940, what percentage of the population in Fresno was Asian?",
+    "excluded_topic": "Fresno,_California"
+  },
+  {
+    "question": "What does a writer for the International Crisis Group think the concept of political Islam is a creation of?",
+    "excluded_topic": "Islamism"
+  },
+  {
+    "question": "How old are the gravestones that reference the plague?",
+    "excluded_topic": "Black_Death"
+  },
+  {
+    "question": "Who has the power to initiate legislation within the European Union?",
+    "excluded_topic": "European_Union_law"
+  },
+  {
+    "question": "What did Donald Davies Develop",
+    "excluded_topic": "Packet_switching"
+  },
+  {
+    "question": "How many lead authors does an IPCC report chapter have?",
+    "excluded_topic": "Intergovernmental_Panel_on_Climate_Change"
+  },
+  {
+    "question": "What two country's referendums curtailed a constitution for Europe?",
+    "excluded_topic": "European_Union_law"
+  },
+  {
+    "question": "What pushes businesses to increase pressures on workers?",
+    "excluded_topic": "Economic_inequality"
+  },
+  {
+    "question": "Are there any regions where the Treaty of European Union excludes from jurisdiction?",
+    "excluded_topic": "European_Union_law"
+  },
+  {
+    "question": "How successful was initial effort by Braddock?",
+    "excluded_topic": "French_and_Indian_War"
+  },
+  {
+    "question": "In which direction did the water on the eastern side flow?",
+    "excluded_topic": "Amazon_rainforest"
+  },
+  {
+    "question": "Which name is also used to describe the Amazon rainforest in English?",
+    "excluded_topic": "Amazon_rainforest"
+  },
+  {
+    "question": "colonial rule would be considered what type of imperialism?",
+    "excluded_topic": "Imperialism"
+  },
+  {
+    "question": "What is the name of the supposition that there are infinite pairs of primes whose difference is 2?",
+    "excluded_topic": "Prime_number"
+  },
+  {
+    "question": "What enemy of Doctor Who is also a Time Lord?",
+    "excluded_topic": "Doctor_Who"
+  },
+  {
+    "question": "Combustion is caused by an oxidant and a fuel. What role does oxygen play in combustion?",
+    "excluded_topic": "Oxygen"
+  },
+  {
+    "question": "Western Imperialism divided the globe according to which theory?",
+    "excluded_topic": "Imperialism"
+  },
+  {
+    "question": "colonial rule, or physical occupation of a territory is an example of what kind of imperialism?",
+    "excluded_topic": "Imperialism"
+  },
+  {
+    "question": "What does the immune system protect against?",
+    "excluded_topic": "Immune_system"
+  },
+  {
+    "question": "Sophocles demonstrated civil disobedience in a play that was called?",
+    "excluded_topic": "Civil_disobedience"
+  },
+  {
+    "question": "What are the three sources of European Union law?",
+    "excluded_topic": "European_Union_law"
+  },
+  {
+    "question": "Who officially opened the V&A?",
+    "excluded_topic": "Victoria_and_Albert_Museum"
+  },
+  {
+    "question": "In 1890, who did the university decide to team up with?",
+    "excluded_topic": "University_of_Chicago"
+  },
+  {
+    "question": "What types of health outcomes do pharmacists aim for with their patients?",
+    "excluded_topic": "Pharmacy"
+  },
+  {
+    "question": "What is the process of constructing a building or infrastructure?",
+    "excluded_topic": "Construction"
+  },
+  {
+    "question": "Where was Genghis Khan likely born?",
+    "excluded_topic": "Genghis_Khan"
+  },
+  {
+    "question": "When was King George's war?",
+    "excluded_topic": "French_and_Indian_War"
+  },
+  {
+    "question": "What do supporters of Islamism believe their views reflect?",
+    "excluded_topic": "Islamism"
+  },
+  {
+    "question": "What sport attracts most tourists to Jacksonville?",
+    "excluded_topic": "Jacksonville,_Florida"
+  },
+  {
+    "question": "When did the Cretaceous-Paleogene extinction happen?",
+    "excluded_topic": "Ctenophora"
+  },
+  {
+    "question": "\"An Account of Further Discoveries in Air\" was published by who in 1775?",
+    "excluded_topic": "Oxygen"
+  },
+  {
+    "question": "What religion's schools does the term 'parochial schools' generally refer to?",
+    "excluded_topic": "Private_school"
+  },
+  {
+    "question": "What goods were sold in a pharma?",
+    "excluded_topic": "Pharmacy"
+  },
+  {
+    "question": "Who is on the IPCC Panel?",
+    "excluded_topic": "Intergovernmental_Panel_on_Climate_Change"
+  },
+  {
+    "question": "Along with sport and art, what is a type of talent scholarship?",
+    "excluded_topic": "Private_school"
+  },
+  {
+    "question": "How many prime numbers exist?",
+    "excluded_topic": "Prime_number"
+  },
+  {
+    "question": "Who normally supervises a construction job?",
+    "excluded_topic": "Construction"
+  },
+  {
+    "question": "What does each packet includ in connectionless mode ",
+    "excluded_topic": "Packet_switching"
+  },
+  {
+    "question": "By what means is imperialism usually administered?",
+    "excluded_topic": "Imperialism"
+  }
+]
