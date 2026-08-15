@@ -61,6 +61,7 @@ flowchart TB
 | Grounding | `grounding.py` | Claim decomposition + semantic/lexical evidence matching |
 | Streaming | `streaming.py` | Background real-time ingestion |
 | Serving | `api.py` | FastAPI `/ingest`, `/query`, `/health`, `/stats` |
+| Frontend | `app.py` | Streamlit UI: ask questions, run the live-streaming demo |
 | Eval | `eval.py` | Full-corpus evaluation harness |
 
 ## Evaluation data
@@ -176,7 +177,29 @@ python scripts/demo_streaming.py
 
 # Run the API
 uvicorn verityrag.api:app --reload
+
+# Run the Streamlit frontend (recommended for demoing this project)
+streamlit run app.py
 ```
+
+### Streamlit frontend
+
+`app.py` gives you a real UI over the same pipeline that powers the API —
+useful for actually demoing this rather than reading code. Two tabs:
+
+- **Ask a question** — load the real corpus (sidebar), optionally calibrate
+  the sufficiency gate, then ask anything; see the answer, grounding score,
+  claim-level grounding breakdown, agent trace, and evidence used.
+- **Real-time streaming demo** — a one-click version of
+  `scripts/demo_streaming.py`: watch a question get refused, watch documents
+  stream into the live index with a real progress bar (backed by the actual
+  `LiveDocumentStream` background thread, not a fake animation), then watch
+  the same question get answered — plus a genuinely out-of-domain question
+  that stays correctly refused throughout.
+
+Covered by its own test suite (`tests/test_app.py`) using Streamlit's
+`AppTest` framework — same TDD approach as the rest of the project, not just
+manual clicking.
 
 ### Minimal usage
 
