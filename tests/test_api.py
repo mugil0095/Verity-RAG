@@ -17,6 +17,14 @@ def test_health_endpoint(client):
     assert resp.json()["status"] == "ok"
 
 
+def test_root_endpoint_returns_service_info(client):
+    resp = client.get("/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["service"] == "VerityRAG"
+    assert body["docs"] == "/docs"
+
+
 def test_ingest_endpoint_adds_document(client):
     resp = client.post("/ingest", json={
         "doc_id": "d1", "title": "Tesla",
