@@ -140,6 +140,8 @@ Elasticsearch itself uses).
 
 ## Known limitations
 
+Tracked as an actual backlog in [ROADMAP.md](ROADMAP.md), not just prose here.
+
 - **Extractive generation by default.** The default generator selects and
   stitches sentences straight from retrieved evidence rather than writing
   fluent prose — it's "grounded by construction" and needs no external API,
