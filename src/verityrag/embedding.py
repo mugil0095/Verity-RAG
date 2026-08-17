@@ -74,12 +74,17 @@ class SentenceTransformerEmbedder(Embedder):
     downloads from the HuggingFace Hub on first use, then runs fully
     offline/locally after that (no per-call network access, no API key).
 
-    BUILD-ENVIRONMENT NOTE: the sandbox this project was developed in has no
-    route to huggingface.co (see the module docstring), so this class's
-    *logic* is covered by mocked unit tests (tests/test_sentence_embedder.py)
-    but the real download-and-encode path has NOT been run end to end in
-    that sandbox -- only tested for real on a machine with normal internet
-    access. Run tests/test_sentence_embedder_live.py locally to confirm.
+    CONFIRMED WORKING (2026-08-16, on a real machine with internet access --
+    the build sandbox for this project has no route to huggingface.co, so
+    this couldn't be verified there). Real semantic separation measured:
+    a paraphrase pair ("cat on mat" / "feline on rug", near-zero literal
+    word overlap) scored 0.563 cosine similarity; an unrelated pair scored
+    -0.018. HashingEmbedder cannot make that distinction -- it has no
+    concept of meaning beyond shared characters/n-grams.
+
+    Deliberately NOT the pipeline's default embedder -- see pipeline.py and
+    eval.py for why. Pass it explicitly wherever real embedding quality is
+    what's being measured (e.g. `run_eval(embedder=SentenceTransformerEmbedder())`).
 
     `normalize_embeddings=True` matters beyond just being tidy: every
     consumer of embeddings in this codebase (retrieval.py, grounding.py,
@@ -92,7 +97,15 @@ class SentenceTransformerEmbedder(Embedder):
         from sentence_transformers import SentenceTransformer
 
         self._model = SentenceTransformer(model_name)
-        self.dim = self._model.get_sentence_embedding_dimension()
+        # get_sentence_embedding_dimension() was renamed to
+        # get_embedding_dimension() in a newer sentence-transformers release
+        # than this project was originally written against (caught via a
+        # real FutureWarning on an actual run, not something visible from
+        # the sandbox) -- support both so this doesn't break either way.
+        if hasattr(self._model, "get_embedding_dimension"):
+            self.dim = self._model.get_embedding_dimension()
+        else:
+            self.dim = self._model.get_sentence_embedding_dimension()
 
     def embed(self, texts: list[str]) -> np.ndarray:
         if not texts:

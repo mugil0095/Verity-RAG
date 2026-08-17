@@ -6,11 +6,10 @@ pickable action instead of a vague standing intention — pick one open item,
 do it, check it off, commit.
 
 ## Status
-- [ ] **Real neural embeddings** — swap `HashingEmbedder` (embedding.py) for
-  a real dense encoder (sentence-transformers, or an embeddings API) behind
-  the same `.embed()` interface. Highest-leverage single change: it's the
-  documented ceiling on the 73.3% hallucination-guard rate and the 68%
-  keyword-hit rate (see README "Known limitations").
+- [ ] **Measure the real embeddings' actual impact** — `SentenceTransformerEmbedder`
+  is done and confirmed working (see Done log), but not yet run against the
+  full eval. Run `python -m verityrag.eval --real-embeddings` and update
+  the README's headline numbers with whatever it reports — don't guess.
 - [ ] **Real LLM generation** — wire `LLMGenerator` (generation.py) to an
   actual model via `complete_fn`. The interface and prompt construction are
   already built; this is the swap-in step. Once live, watch the grounding
@@ -37,8 +36,21 @@ do it, check it off, commit.
 - [x] FastAPI serving layer + root endpoint
 - [x] Streamlit frontend + AppTest coverage
 - [x] Full eval harness with disjoint calibration/test split
-- [x] 66 tests passing
+- [x] Real neural embeddings (`SentenceTransformerEmbedder`) — confirmed
+  working on a real machine: paraphrase similarity 0.563 vs. unrelated
+  -0.018. Deliberately NOT the pipeline default (would force every
+  test/CI run to need internet + a model download); opt in explicitly via
+  `run_eval(embedder=SentenceTransformerEmbedder())` or `--real-embeddings`
+- [x] 70 tests passing (+3 that need local internet to run)
 
 ## Log
 <!-- Add a dated one-line entry each time an item moves from Status to Done. -->
 - 2026-08-15 — Roadmap created from README "Known limitations."
+- 2026-08-16 — Added SentenceTransformerEmbedder + mocked wrapper tests.
+  Confirmed working end-to-end on a real machine (paraphrase 0.563 vs.
+  unrelated -0.018). Caught and fixed a real FutureWarning (renamed
+  sentence-transformers method) and a real mocking bug (MagicMock
+  auto-creates attributes, so hasattr-based fallback logic needs `del` to
+  simulate an old API version in tests). Decided against flipping the
+  pipeline default — added `--real-embeddings` to eval.py instead, so the
+  upgrade is opt-in where it matters without slowing down every test run.
