@@ -2,13 +2,35 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
+
+env:
+  # Defensive, not confirmed necessary on Linux: these fixed a real,
+  # reproducible crash on Windows during development (Windows
+  # STATUS_ACCESS_VIOLATION from conflicting OpenMP runtimes -- torch vs
+  # MKL-linked scikit-learn/LightGBM, all three used in this project). CI
+  # runs on Linux, which may not hit the same failure mode, but setting
+  # these costs nothing and removes the question entirely rather than
+  # hoping it doesn't happen here too.
+  KMP_DUPLICATE_LIB_OK: "TRUE"
+  OMP_NUM_THREADS: "1"
+  MKL_NUM_THREADS: "1"
 
 jobs:
   test:
+    # This job is the one to require passing before merge (see repo
+    # Settings -> Branches -> branch protection rule -- not expressible in
+    # this file). Deliberately excludes test_sentence_embedder_live.py,
+    # which downloads a real model from HuggingFace on every run
+    # (unauthenticated -- subject to HF Hub rate limits): that makes it
+    # slow and occasionally flaky for reasons that have nothing to do with
+    # whether the code is actually correct. The mocked wrapper-logic tests
+    # (test_sentence_embedder.py, included here) already cover that code
+    # path without needing the network.
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
@@ -30,8 +52,30 @@ jobs:
       - name: Build real evaluation corpus (fetches SQuAD dev set)
         run: python data/build_corpus.py
 
-      - name: Run test suite
-        run: pytest tests/ -v --tb=short
+      - name: Run test suite (fast, deterministic, no network)
+        run: pytest tests/ -v --tb=short --ignore=tests/test_sentence_embedder_live.py
 
-      - name: Run full evaluation report
+      - name: Run full evaluation report (default embedder)
         run: python -m verityrag.eval
+
+  real-embeddings-live-check:
+    # Separate, non-blocking job -- see the note on the main job above for
+    # why this one is isolated instead of included there.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Run live SentenceTransformerEmbedder test (real model download)
+        run: pytest tests/test_sentence_embedder_live.py -v

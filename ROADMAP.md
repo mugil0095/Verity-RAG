@@ -28,8 +28,12 @@ do it, check it off, commit.
   (indexing.py `LexicalIndex`) with real Elasticsearch/OpenSearch. Removes
   the full-rebuild-per-add cost on the streaming ingestion path (currently
   ~430ms/doc against a large index — see README "Design decisions").
-- [ ] **CI badge + branch protection** — once pushed to GitHub, add the
-  Actions status badge to the README and require CI to pass before merge.
+- [ ] **Enable branch protection + add the CI badge** — the workflow itself
+  is fixed now (see Done log: it silently never ran, targeted the wrong
+  branch name). Two manual steps left, both in the GitHub UI, not
+  expressible in the workflow file: enable branch protection requiring the
+  `test` job to pass before merge, and add the status badge to the top of
+  README.md.
 
 ## Done
 - [x] Core pipeline: chunking, hybrid retrieval, LightGBM reranker (ICT
@@ -78,6 +82,13 @@ do it, check it off, commit.
   dilution noise both ways, correctly for the wrong reason on one side.
 - [x] 78 tests passing locally (75 in CI/offline — 3 need internet for the
   live model download, gracefully skipped there)
+- [x] Fixed the CI workflow itself: it targeted branch `main`, but this
+  repo's actual default branch is `master` — CI had never once run,
+  silently, since the workflow was written. Also split into a required
+  fast/deterministic job and a separate non-blocking job for the real
+  HuggingFace model download (rate-limit-prone on shared CI runners,
+  flaky for reasons unrelated to code correctness), and added workflow
+  timeouts so a stuck job fails fast instead of running for hours.
 
 ## Log
 <!-- Add a dated one-line entry each time an item moves from Status to Done. -->
