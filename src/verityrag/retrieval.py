@@ -52,13 +52,12 @@ def hybrid_retrieve(
     lexical_weight: float = 0.4,
     dense_weight: float = 0.6,
 ) -> list[RetrievedChunk]:
-    snapshot = index.snapshot()
+    snapshot, doc_vecs = index.snapshot_with_matrix()
     if not snapshot:
         return []
 
     lexical_scores = index.lexical_index.scores(query)
     query_vec = embedder.embed([query])
-    doc_vecs = np.vstack([ic.vector for ic in snapshot])
     dense_scores = cosine_sim_matrix(query_vec, doc_vecs)[0]
 
     lexical_norm = _min_max_normalize(lexical_scores)

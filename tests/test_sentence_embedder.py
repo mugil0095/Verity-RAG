@@ -85,3 +85,45 @@ def test_wrapper_handles_empty_input_without_calling_model():
 
     assert result.shape == (0, 4)
     fake_model.encode.assert_not_called()
+
+
+def test_progress_bar_shown_for_large_batches():
+    """Regression test: a real run with this always-on (no size threshold)
+    produced hundreds of near-instant, one-item progress bars during a
+    150-question eval run -- useless noise. And before that, always-off
+    looked indistinguishable from a hang during a slow 845-chunk bulk
+    encode. The threshold is what actually fixes both: show it only when a
+    batch is big enough that a progress bar is worth anything."""
+    fake_model = _new_api_mock(4)
+    fake_model.encode.return_value = np.zeros((25, 4))
+    with patch("sentence_transformers.SentenceTransformer", return_value=fake_model):
+        from verityrag.embedding import SentenceTransformerEmbedder
+        emb = SentenceTransformerEmbedder("fake-model")
+        emb.embed([f"text {i}" for i in range(25)])  # >= threshold
+
+    _, kwargs = fake_model.encode.call_args
+    assert kwargs.get("show_progress_bar") is True
+
+
+def test_progress_bar_suppressed_for_small_batches_even_when_enabled():
+    fake_model = _new_api_mock(4)
+    fake_model.encode.return_value = np.zeros((1, 4))
+    with patch("sentence_transformers.SentenceTransformer", return_value=fake_model):
+        from verityrag.embedding import SentenceTransformerEmbedder
+        emb = SentenceTransformerEmbedder("fake-model")  # show_progress_bar=True (default)
+        emb.embed(["some text"])  # 1 item, well under threshold
+
+    _, kwargs = fake_model.encode.call_args
+    assert kwargs.get("show_progress_bar") is False
+
+
+def test_progress_bar_can_be_disabled_explicitly():
+    fake_model = _new_api_mock(4)
+    fake_model.encode.return_value = np.zeros((1, 4))
+    with patch("sentence_transformers.SentenceTransformer", return_value=fake_model):
+        from verityrag.embedding import SentenceTransformerEmbedder
+        emb = SentenceTransformerEmbedder("fake-model", show_progress_bar=False)
+        emb.embed(["some text"])
+
+    _, kwargs = fake_model.encode.call_args
+    assert kwargs.get("show_progress_bar") is False

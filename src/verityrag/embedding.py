@@ -15,7 +15,7 @@ periodic re-fitting.
 For production, swap `HashingEmbedder` for a real dense encoder (sentence-transformers,
 OpenAI/Voyage/Anthropic embeddings API, etc.) behind the same `.embed()` interface --
 the rest of the system (index, retrieval, agent, grounding) is agnostic to how the
-vector was produced. SentenceTransformerEmbedder below is that swap-in.
+vector was produced.
 """
 from __future__ import annotations
 
@@ -91,12 +91,33 @@ class SentenceTransformerEmbedder(Embedder):
     sufficiency.py) goes through cosine_sim_matrix() above, which assumes
     pre-normalized input and just takes a dot product -- skip normalization
     here and every downstream similarity score would be silently wrong.
+
+    `show_progress_bar` defaults to True -- a real model encoding hundreds
+    of chunks in one batch on CPU takes real, visible-feeling time (nothing
+    like HashingEmbedder's instant hashing), and with no progress output
+    that silence is genuinely indistinguishable from a hang. Learned this
+    from a real run, not anticipated in advance. Pass False explicitly for
+    contexts where a progress bar would be noise instead of useful (e.g. a
+    live server request), but eval.py and any long bulk-ingest call should
+    keep it on.
     """
 
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2", show_progress_bar: bool = True):
+        import os
+        # Works around a real, reproducible crash (Windows STATUS_ACCESS_VIOLATION,
+        # 0xC0000005) hit during actual use of this class: torch (loaded here via
+        # sentence-transformers) and MKL-linked numpy/scikit-learn/LightGBM --
+        # all three used elsewhere in this pipeline -- each bundle their own
+        # OpenMP runtime, and loading more than one into the same process can
+        # crash outright rather than just warn. This is PyTorch's own documented
+        # workaround for that class of conflict, not a project-specific hack.
+        # setdefault() so it never clobbers a value the caller deliberately set.
+        os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+
         from sentence_transformers import SentenceTransformer
 
         self._model = SentenceTransformer(model_name)
+        self._show_progress_bar = show_progress_bar
         # get_sentence_embedding_dimension() was renamed to
         # get_embedding_dimension() in a newer sentence-transformers release
         # than this project was originally written against (caught via a
@@ -110,9 +131,19 @@ class SentenceTransformerEmbedder(Embedder):
     def embed(self, texts: list[str]) -> np.ndarray:
         if not texts:
             return np.zeros((0, self.dim))
+        # Only show a progress bar for batches actually big enough that one
+        # is useful (bulk ingestion of hundreds of chunks). Without this
+        # threshold, show_progress_bar=True fires on EVERY embed() call
+        # throughout the pipeline -- including the handful-of-items calls
+        # retrieval/generation/grounding each make per single query -- which
+        # produces hundreds of near-instant, useless progress bars during a
+        # normal eval run instead of the one bar that's actually worth
+        # seeing. Seen for real: a 150-question eval run produced a wall of
+        # "Batches: 1/1" spam once this was naively always-on.
+        show_bar = self._show_progress_bar and len(texts) >= 20
         return self._model.encode(
             texts,
             normalize_embeddings=True,
-            show_progress_bar=False,
+            show_progress_bar=show_bar,
             convert_to_numpy=True,
         )
