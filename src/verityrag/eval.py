@@ -22,6 +22,10 @@ Metrics:
   - latency p50/p95
 
 Run with: python -m verityrag.eval
+Run with real neural embeddings instead of the default hashed ones:
+         python -m verityrag.eval --real-embeddings
+         (needs `pip install sentence-transformers` + internet access for
+         the one-time model download -- see embedding.py)
 """
 from __future__ import annotations
 
@@ -31,6 +35,7 @@ import statistics
 import time
 from pathlib import Path
 
+from .embedding import Embedder
 from .pipeline import VerityRAGPipeline
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
@@ -48,7 +53,14 @@ def _split(items: list, calib_fraction: float, seed: int) -> tuple[list, list]:
     return items[:n_calib], items[n_calib:]
 
 
-def run_eval(use_reranker: bool = True, calibrate: bool = True, verbose: bool = True) -> dict:
+def run_eval(use_reranker: bool = True, calibrate: bool = True, verbose: bool = True,
+             embedder: Embedder | None = None) -> dict:
+    """`embedder`: defaults to None, which lets VerityRAGPipeline use its own
+    default (HashingEmbedder -- fast, no dependencies, no network). Pass an
+    explicit embedder (e.g. SentenceTransformerEmbedder()) to evaluate real
+    embedding quality instead -- this is the intended way to measure that
+    upgrade's actual impact on coverage/hallucination-guard, rather than
+    changing the pipeline's global default (see ROADMAP.md)."""
     corpus = _load("corpus.json")
     eval_answerable = _load("eval_answerable.json")
     eval_unanswerable = _load("eval_unanswerable.json")
@@ -56,7 +68,7 @@ def run_eval(use_reranker: bool = True, calibrate: bool = True, verbose: bool = 
     calib_pos, test_pos = _split(eval_answerable, calib_fraction=0.5, seed=13)
     calib_neg, test_neg = _split(eval_unanswerable, calib_fraction=0.5, seed=13)
 
-    pipeline = VerityRAGPipeline()
+    pipeline = VerityRAGPipeline(embedder=embedder)
 
     t0 = time.time()
     pipeline.ingest_documents(corpus)
@@ -104,6 +116,7 @@ def run_eval(use_reranker: bool = True, calibrate: bool = True, verbose: bool = 
             correctly_abstained += 1
 
     report = {
+        "embedder": type(pipeline.embedder).__name__,
         "corpus_docs": len(corpus),
         "corpus_chunks": pipeline.index.size(),
         "ingest_time_sec": round(ingest_time, 3),
@@ -127,4 +140,19 @@ def run_eval(use_reranker: bool = True, calibrate: bool = True, verbose: bool = 
 
 
 if __name__ == "__main__":
-    run_eval()
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--real-embeddings", action="store_true",
+        help="Use SentenceTransformerEmbedder instead of the default HashingEmbedder "
+             "(needs `pip install sentence-transformers` + internet for the model download)",
+    )
+    args = parser.parse_args()
+
+    chosen_embedder = None
+    if args.real_embeddings:
+        from .embedding import SentenceTransformerEmbedder
+        chosen_embedder = SentenceTransformerEmbedder()
+
+    run_eval(embedder=chosen_embedder)

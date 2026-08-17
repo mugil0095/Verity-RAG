@@ -14,7 +14,7 @@ import pytest
 
 pytest.importorskip("sentence_transformers")
 
-from src.verityrag.embedding import SentenceTransformerEmbedder, cosine_sim_matrix  # noqa: E402
+from verityrag.embedding import SentenceTransformerEmbedder, cosine_sim_matrix  # noqa: E402
 
 
 @pytest.fixture(scope="module")
