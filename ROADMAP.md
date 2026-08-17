@@ -28,12 +28,6 @@ do it, check it off, commit.
   (indexing.py `LexicalIndex`) with real Elasticsearch/OpenSearch. Removes
   the full-rebuild-per-add cost on the streaming ingestion path (currently
   ~430ms/doc against a large index — see README "Design decisions").
-- [ ] **Enable branch protection + add the CI badge** — the workflow itself
-  is fixed now (see Done log: it silently never ran, targeted the wrong
-  branch name). Two manual steps left, both in the GitHub UI, not
-  expressible in the workflow file: enable branch protection requiring the
-  `test` job to pass before merge, and add the status badge to the top of
-  README.md.
 
 ## Done
 - [x] Core pipeline: chunking, hybrid retrieval, LightGBM reranker (ICT
@@ -89,6 +83,14 @@ do it, check it off, commit.
   HuggingFace model download (rate-limit-prone on shared CI runners,
   flaky for reasons unrelated to code correctness), and added workflow
   timeouts so a stuck job fails fast instead of running for hours.
+  Simplified away an accidental matrix (2 Python versions) that produced
+  ambiguous check names (`test (3.11)` / `test (3.12)`, not `test`) and
+  blocked branch protection from finding the check at all.
+- [x] Enabled branch protection on `master`, requiring the `test` job to
+  pass before merge — confirmed against a real successful run
+  (`https://github.com/mugil0095/Verity-RAG/actions/runs/32063731699`),
+  not just configured and assumed working. Added the CI status badge to
+  the top of README.md.
 
 ## Log
 <!-- Add a dated one-line entry each time an item moves from Status to Done. -->
@@ -140,3 +142,12 @@ do it, check it off, commit.
   more/smaller evidence sentences instead of fewer/larger chunks per query.
   Updated README "Real embeddings, measured" with the full current numbers
   and explanation. 78 tests passing locally, all green.
+- 2026-08-18 — Simplified CI's Python matrix down to a single version
+  after it caused a real, confusing problem: matrix jobs report as
+  `test (3.11)` / `test (3.12)`, not `test`, so branch protection's status
+  check search couldn't find a plain `test` to require. Verified the fix
+  by fetching the actual latest workflow run directly rather than trusting
+  it worked — confirmed exactly one job named `test`, status Success.
+  Branch protection enabled on `master` requiring it. CI badge added to
+  README. This closes out the CI roadmap item completely: a real,
+  currently-running, merge-blocking check, not just a committed YAML file.
