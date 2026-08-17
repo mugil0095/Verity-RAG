@@ -6,10 +6,6 @@
 
 **Real-time agentic RAG with grounding & hallucination detection.**
 
-# VerityRAG
-
-**Real-time agentic RAG with grounding & hallucination detection.**
-
 VerityRAG ingests documents continuously (no offline reindex step), answers
 questions through a bounded multi-hop retrieval agent, and refuses to answer
 rather than hallucinate when it doesn't have grounded evidence — verified on
