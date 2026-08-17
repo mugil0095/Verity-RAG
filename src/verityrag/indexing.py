@@ -103,3 +103,19 @@ class LiveIndex:
         """Consistent read of all indexed chunks for a single query."""
         with self._lock:
             return list(self._chunks)
+
+    def snapshot_with_matrix(self) -> tuple[list[IndexedChunk], np.ndarray]:
+        """Like snapshot(), but also returns the corresponding dense vector
+        matrix from the SAME read (same lock acquisition), so row i of the
+        matrix is guaranteed to correspond to chunks[i] even if another
+        thread adds documents concurrently between two separate calls.
+
+        Exists because retrieval.py used to call snapshot() and then
+        rebuild a full dense matrix from individual chunk.vector attributes
+        via np.vstack -- reallocating and recopying the ENTIRE index's
+        vectors into a brand new array on every single query. Found via a
+        real MemoryError on a memory-constrained machine: 422MB reallocated
+        per query against the full 845-chunk corpus, for data that
+        vector_index already held in exactly this form. Use this instead."""
+        with self._lock:
+            return list(self._chunks), self.vector_index.matrix()

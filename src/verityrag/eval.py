@@ -29,6 +29,30 @@ Run with real neural embeddings instead of the default hashed ones:
 """
 from __future__ import annotations
 
+import os
+# Must happen before ANY of this module's own imports below, not just before
+# SentenceTransformerEmbedder gets constructed later -- `from .pipeline import
+# VerityRAGPipeline` a few lines down already pulls in LightGBM (via
+# reranker.py), and LightGBM's native thread pool needs to see this at ITS
+# OWN import/init time, not whenever the embedder happens to be built.
+#
+# Two real, reproducible Windows crashes led here, in this order:
+#  1. STATUS_ACCESS_VIOLATION (0xC0000005) the moment sentence-transformers/
+#     torch loaded, because MKL-linked numpy/scikit-learn/LightGBM and torch
+#     each bundle their own OpenMP runtime, and loading two into one process
+#     can abort outright rather than warn. KMP_DUPLICATE_LIB_OK=TRUE is
+#     PyTorch's own documented workaround for that.
+#  2. A second, similar-looking crash that only showed up ~100+ questions
+#     into the real eval's query loop -- which alternates torch (embed) and
+#     LightGBM (rerank) calls on every single question -- but never showed
+#     up in isolated testing that used torch alone. That pattern points to
+#     runtime thread-pool contention BETWEEN the two OpenMP runtimes, not
+#     just the load-time conflict #1 already covers. Forcing single-threaded
+#     BLAS/OpenMP execution removes the contention rather than racing it.
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+
 import json
 import random
 import statistics

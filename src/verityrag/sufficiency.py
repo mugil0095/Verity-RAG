@@ -124,6 +124,7 @@ def train_sufficiency_gate(examples: list[CalibrationExample]) -> CalibratedSuff
         learning_rate=0.1,
         min_child_samples=2,
         verbosity=-1,
+        random_state=42,
     )
     model.fit(X, y)
     return CalibratedSufficiencyGate(model)
