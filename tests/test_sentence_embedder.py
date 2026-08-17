@@ -20,7 +20,7 @@ def test_wrapper_reports_model_dimension():
     fake_model = MagicMock()
     fake_model.get_sentence_embedding_dimension.return_value = 384
     with patch("sentence_transformers.SentenceTransformer", return_value=fake_model):
-        from src.verityrag.embedding import SentenceTransformerEmbedder
+        from verityrag.embedding import SentenceTransformerEmbedder
         emb = SentenceTransformerEmbedder("fake-model")
     assert emb.dim == 384
 
@@ -30,7 +30,7 @@ def test_wrapper_requests_normalized_embeddings():
     fake_model.get_sentence_embedding_dimension.return_value = 4
     fake_model.encode.return_value = np.array([[0.5, 0.5, 0.5, 0.5]])
     with patch("sentence_transformers.SentenceTransformer", return_value=fake_model):
-        from src.verityrag.embedding import SentenceTransformerEmbedder
+        from verityrag.embedding import SentenceTransformerEmbedder
         emb = SentenceTransformerEmbedder("fake-model")
         result = emb.embed(["some text"])
 
@@ -45,7 +45,7 @@ def test_wrapper_handles_empty_input_without_calling_model():
     fake_model = MagicMock()
     fake_model.get_sentence_embedding_dimension.return_value = 4
     with patch("sentence_transformers.SentenceTransformer", return_value=fake_model):
-        from src.verityrag.embedding import SentenceTransformerEmbedder
+        from verityrag.embedding import SentenceTransformerEmbedder
         emb = SentenceTransformerEmbedder("fake-model")
         result = emb.embed([])
 
