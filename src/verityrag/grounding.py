@@ -8,7 +8,9 @@ score how well each claim is supported by the retrieved evidence set, using
 two complementary signals:
 
   1. semantic similarity  -- max cosine similarity between the claim and any
-     single evidence chunk (via the same embedder used for retrieval)
+     single evidence SENTENCE (via the same embedder used for retrieval) --
+     see the "sentence-level, not chunk-level" note below for why this
+     matters
   2. lexical grounding    -- fraction of the claim's informative (non-stopword)
      tokens that literally appear in the evidence, which catches numeric/
      entity fabrication that a purely semantic score can miss (e.g. a claim
@@ -18,6 +20,22 @@ two complementary signals:
 A claim is only trusted if BOTH signals clear their thresholds -- requiring
 agreement between a semantic and a lexical view is what lets this catch
 "plausible-sounding but wrong" fabrications, not just off-topic ones.
+
+Sentence-level, not chunk-level: evidence chunks are multi-sentence by
+design (chunking.py), and embedding a whole chunk as one vector dilutes a
+claim's similarity to the ONE sentence it actually matches -- measured
+directly: a claim scored 1.0 against its own source sentence in isolation,
+but only 0.41 against the 5-sentence chunk containing that exact sentence
+plus four unrelated ones (2.4x dilution), using nothing more exotic than
+HashingEmbedder. This is why avg_grounding_score measured 0.967 instead of
+1.0 with a real neural embedder even though the extractive generator is
+grounded by construction -- a real encoder's un-diluted similarity for a
+genuine match is naturally more moderate than a hash-based one (embedding-
+space geometry, not a flaw), so the same dilution effect can tip a
+genuinely-grounded claim below a threshold that was fine for the less-
+diluted case. Comparing against individual evidence sentences instead of
+whole chunks removes the dilution rather than just tuning a number around
+it.
 """
 from __future__ import annotations
 
@@ -77,13 +95,24 @@ def check_grounding(
         return GroundingReport(claims=report_claims, overall_score=0.0,
                                 ungrounded_claims=claims, verdict="ungrounded")
 
-    evidence_texts = [e.text for e in evidence]
-    evidence_ids = [e.chunk_id for e in evidence]
-    evidence_token_sets = [_informative_tokens(t) for t in evidence_texts]
+    # Decompose each evidence chunk into its own sentences so matching
+    # happens at sentence granularity, not whole-chunk -- see module
+    # docstring for the measured dilution effect this avoids. A chunk that
+    # fails to split (e.g. no terminal punctuation) falls back to its full
+    # text as a single "sentence" rather than being silently dropped.
+    evidence_sentences: list[str] = []
+    evidence_sentence_chunk_ids: list[str] = []
+    for e in evidence:
+        sents = split_sentences(e.text) or [e.text]
+        for s in sents:
+            evidence_sentences.append(s)
+            evidence_sentence_chunk_ids.append(e.chunk_id)
+
+    evidence_token_sets = [_informative_tokens(s) for s in evidence_sentences]
 
     claim_vecs = embedder.embed(claims)
-    evidence_vecs = embedder.embed(evidence_texts)
-    sim_matrix = cosine_sim_matrix(claim_vecs, evidence_vecs)  # [n_claims, n_evidence]
+    evidence_vecs = embedder.embed(evidence_sentences)
+    sim_matrix = cosine_sim_matrix(claim_vecs, evidence_vecs)  # [n_claims, n_evidence_sentences]
 
     results: list[ClaimGrounding] = []
     for i, claim in enumerate(claims):
@@ -103,7 +132,7 @@ def check_grounding(
             semantic_support=round(semantic_support, 4),
             lexical_support=round(lexical_support, 4),
             is_grounded=is_grounded,
-            best_evidence_chunk_id=evidence_ids[best_idx] if best_idx >= 0 else None,
+            best_evidence_chunk_id=evidence_sentence_chunk_ids[best_idx] if best_idx >= 0 else None,
         ))
 
     grounded_count = sum(1 for r in results if r.is_grounded)

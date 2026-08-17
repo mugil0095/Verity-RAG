@@ -6,16 +6,10 @@ pickable action instead of a vague standing intention — pick one open item,
 do it, check it off, commit.
 
 ## Status
-- [ ] **Re-tune the grounding checker for the new embedder** — `semantic_threshold=0.15`
-  (grounding.py) was empirically chosen for HashingEmbedder's score
-  distribution. avg_grounding_score dipped 1.0 → 0.967 with real
-  embeddings even though the extractive generator is grounded by
-  construction — a plausible sign this threshold isn't well-calibrated for
-  the new embedding space. Worth its own measurement, not a guess.
-- [ ] **Investigate the coverage regression with real embeddings** (96% → 88%)
+- [ ] **Investigate the coverage regression with real embeddings** (96% → 89.3%)
   — best current explanation is real embeddings underweighting exact
   vocabulary overlap that SQuAD questions often have with their source
-  sentence, but that's a hypothesis, not confirmed. Look at which of the 9
+  sentence, but that's a hypothesis, not confirmed. Look at which of the 8
   wrongly-abstained questions differ from the 3 under HashingEmbedder.
 - [ ] **Recover latency without losing stability** — `OMP_NUM_THREADS=1` /
   `MKL_NUM_THREADS=1` fixed a real crash but forces single-threaded
@@ -62,7 +56,6 @@ do it, check it off, commit.
   MKL-linked scikit-learn/LightGBM) at model-load time, then a second one
   from runtime thread-pool contention under sustained interleaved use —
   see README "Design decisions".
-- [x] 73 tests passing (+3 that need local internet to run)
 - [x] Fixed two real memory bugs on a memory-constrained machine (found via
   actual `MemoryError` crashes, not review): a dead `np.vstack` line in
   `generate_ict_training_data` that allocated a 422MB array and never used
@@ -70,6 +63,21 @@ do it, check it off, commit.
   on every single query instead of reusing the one `LiveIndex` already
   maintains. Fixing the second one dropped query latency **150ms → 57ms
   p50** — a real, measured win, not just a memory fix.
+- [x] Fixed a real dilution bug in grounding.py: claims were matched
+  against whole multi-sentence evidence chunks, not individual sentences.
+  Measured directly (HashingEmbedder alone, no real encoder needed): a
+  claim scored 1.0 against its own source sentence in isolation but only
+  0.41 against a 5-sentence chunk containing that sentence plus four
+  unrelated ones (2.4x dilution). Fixed by decomposing evidence into
+  sentences before matching. `best_evidence_chunk_id` still correctly maps
+  back to the parent chunk either way. **Confirmed against the real
+  encoder: avg_grounding_score 0.967 → 1.0**, exactly matching
+  HashingEmbedder's ceiling. Same fix moved coverage/guard by one question
+  each in opposite directions (88%→89.3%, 84%→82.7%) — the agent's
+  grounding-based final-abstention check was occasionally tripped by the
+  dilution noise both ways, correctly for the wrong reason on one side.
+- [x] 78 tests passing locally (75 in CI/offline — 3 need internet for the
+  live model download, gracefully skipped there)
 
 ## Log
 <!-- Add a dated one-line entry each time an item moves from Status to Done. -->
@@ -103,3 +111,21 @@ do it, check it off, commit.
   Added `LiveIndex.snapshot_with_matrix()` to expose it properly. Verified
   eval numbers unchanged (pure performance fix) — and query latency p50
   dropped from ~150ms to 57ms as a direct result.
+- 2026-08-18 — Investigated the 1.0 → 0.967 avg_grounding_score gap seen
+  with real embeddings instead of guessing at a new threshold number.
+  Found and confirmed the actual cause empirically (using HashingEmbedder
+  alone, no real encoder needed): matching a claim against a whole
+  multi-sentence evidence chunk dilutes similarity to the one sentence it
+  actually matches -- 2.4x dilution measured directly. Fixed by comparing
+  claims against individual evidence sentences instead of whole chunks.
+  2 new regression tests.
+- 2026-08-18 — Confirmed the grounding fix against the real encoder:
+  avg_grounding_score 0.967 -> 1.0, closing the gap completely. Coverage
+  and hallucination guard each moved by one question in opposite
+  directions (88%->89.3%, 84%->82.7%) -- explained, not just observed: the
+  agent's grounding-based final-abstention check was occasionally tripped
+  by the old dilution noise in both directions. Latency increased further
+  (1557ms -> 1764ms p50), plausibly from the grounding check now embedding
+  more/smaller evidence sentences instead of fewer/larger chunks per query.
+  Updated README "Real embeddings, measured" with the full current numbers
+  and explanation. 78 tests passing locally, all green.

@@ -167,29 +167,52 @@ the pipeline's default (see below for why).
 
 | Metric | HashingEmbedder (default) | SentenceTransformerEmbedder |
 |---|---|---|
-| Coverage | 96% | 88% |
-| Hallucination guard | 73.3% | **84%** |
-| Keyword hit rate | 68.1% | 71.2% |
-| Avg grounding score | 1.0 | 0.967 |
-| Latency, p50 | ~150ms | ~1,560ms |
+| Coverage | 96% | 89.3% |
+| Hallucination guard | 73.3% | **82.7%** |
+| Keyword hit rate | 68.1% | 70.1% |
+| Avg grounding score | 1.0 | **1.0** |
+| Latency, p50 | ~50ms | ~1,764ms |
 
 Not a clean win, reported as measured rather than cherry-picked. The
 headline hypothesis is confirmed — a real encoder closes a meaningful chunk
-of the hallucination-guard gap (+10.7pp) — but it comes with two real
-costs: coverage drops 8 points (6 more genuinely answerable questions get
-wrongly refused), and latency increases roughly 10x. Some of that latency
-is inflated by a stability workaround (see "Design decisions" above) rather
-than being purely inherent to using a real encoder, but even accounting for
-that, CPU transformer inference is never going to match instant hashing.
+of the hallucination-guard gap (+9.4pp) — but it comes with two real costs:
+coverage drops ~7 points (5 more genuinely answerable questions get wrongly
+refused), and latency increases roughly 35x. Some of that latency is
+inflated by a stability workaround (see "Design decisions" above), and some
+by a later fix that embeds evidence at sentence granularity instead of
+whole chunks (see below) — more, smaller items through the encoder per
+query — rather than being purely inherent to using a real encoder. Even
+accounting for both, CPU transformer inference is never going to match
+instant hashing.
 
-Best current explanation for the coverage drop: SQuAD questions are often
-near-paraphrases of their source sentence, sharing exact vocabulary —
-precisely what the hash-based lexical matching is good at. A neural encoder
-captures broader meaning but can occasionally underweight that literal
-overlap for a correct-but-differently-phrased passage.
+Avg grounding score was originally 0.967, not 1.0, despite the extractive
+generator being grounded by construction. Traced to a real bug, not a
+tuning problem: `check_grounding` compared each claim against whole
+multi-sentence evidence chunks, and embedding a multi-sentence chunk as one
+vector dilutes a claim's similarity to the one sentence it actually
+matches — measured directly (no real encoder needed to confirm this part):
+a claim scored 1.0 against its own source sentence in isolation but only
+0.41 against a 5-sentence chunk containing that sentence plus four
+unrelated ones. `HashingEmbedder` never showed this, because its diluted
+score (0.41) still cleared the grounding threshold comfortably; a real
+encoder's un-diluted score for a genuine match starts from a more moderate
+baseline, so the same dilution could tip a genuinely-grounded claim below
+threshold. Fixed by matching against individual evidence sentences instead
+of whole chunks, and confirmed against the real encoder: **1.0**, exactly
+matching `HashingEmbedder`'s ceiling. That same fix moved coverage and
+guard by one question each in opposite directions (96→88 became 88→89.3;
+84 became 82.7) — the grounding-based final-abstention check in the agent
+loop was occasionally tripped by the dilution noise in both directions,
+correctly for the wrong reason on one side, incorrectly on the other.
+
+Best current explanation for the remaining coverage gap: SQuAD questions
+are often near-paraphrases of their source sentence, sharing exact
+vocabulary — precisely what the hash-based lexical matching is good at. A
+neural encoder captures broader meaning but can occasionally underweight
+that literal overlap for a correct-but-differently-phrased passage.
 
 This is why `SentenceTransformerEmbedder` is not the pipeline default: for
-a system explicitly positioned as *real-time*, a ~10x latency cost isn't
+a system explicitly positioned as *real-time*, a >10x latency cost isn't
 currently justified by the guard improvement, especially with the
 underlying crash issue only worked around (see below), not resolved
 cleanly. That's a deliberate, measured decision, not an oversight — swap it
