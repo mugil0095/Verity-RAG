@@ -1,3 +1,5 @@
+[![CI](https://github.com/mugil0095/Verity-RAG/actions/workflows/ci.yml/badge.svg)](https://github.com/mugil0095/Verity-RAG/actions/workflows/ci.yml)
+
 # VerityRAG
 
 **Real-time agentic RAG with grounding & hallucination detection.**
