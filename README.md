@@ -1,4 +1,10 @@
 [![CI](https://github.com/mugil0095/Verity-RAG/actions/workflows/ci.yml/badge.svg)](https://github.com/mugil0095/Verity-RAG/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/mugil0095/Verity-RAG/blob/master/LICENSE)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
+
+# VerityRAG
+
+**Real-time agentic RAG with grounding & hallucination detection.**
 
 # VerityRAG
 
