@@ -86,7 +86,6 @@ def generate_ict_training_data(
     if len(eligible) < n_negatives + 1:
         return []
 
-    all_vecs = np.vstack([ic.vector for ic in chunks])
     examples: list[WeakExample] = []
 
     for group_id in range(n_queries):
@@ -148,6 +147,7 @@ def train_reranker(examples: list[WeakExample]) -> lgb.LGBMRanker:
         learning_rate=0.1,
         min_child_samples=1,
         verbosity=-1,
+        random_state=42,
     )
     model.fit(X, y, group=groups)
     return model
