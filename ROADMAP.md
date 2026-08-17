@@ -63,6 +63,13 @@ do it, check it off, commit.
   from runtime thread-pool contention under sustained interleaved use —
   see README "Design decisions".
 - [x] 73 tests passing (+3 that need local internet to run)
+- [x] Fixed two real memory bugs on a memory-constrained machine (found via
+  actual `MemoryError` crashes, not review): a dead `np.vstack` line in
+  `generate_ict_training_data` that allocated a 422MB array and never used
+  it, and `hybrid_retrieve` rebuilding that same 422MB matrix from scratch
+  on every single query instead of reusing the one `LiveIndex` already
+  maintains. Fixing the second one dropped query latency **150ms → 57ms
+  p50** — a real, measured win, not just a memory fix.
 
 ## Log
 <!-- Add a dated one-line entry each time an item moves from Status to Done. -->
@@ -86,3 +93,13 @@ do it, check it off, commit.
   Documented the full trade-off in README "Real embeddings, measured" —
   decided NOT to flip the pipeline default given the latency cost versus a
   system explicitly positioned as real-time.
+- 2026-08-17 — Found and fixed two real memory bugs via an actual full test
+  suite run hitting `MemoryError` on a memory-constrained Windows machine
+  (never surfaced in the build sandbox, which has more headroom): a dead
+  `np.vstack` line in the reranker's ICT training that allocated a 422MB
+  array and never used the result, and `hybrid_retrieve` reconstructing
+  that same 422MB matrix from individual chunk vectors on every single
+  query instead of reusing the one already maintained in `LiveIndex`.
+  Added `LiveIndex.snapshot_with_matrix()` to expose it properly. Verified
+  eval numbers unchanged (pure performance fix) — and query latency p50
+  dropped from ~150ms to 57ms as a direct result.
