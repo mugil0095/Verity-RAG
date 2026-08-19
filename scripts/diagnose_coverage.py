@@ -59,22 +59,27 @@ def diagnose(embedder=None, top_k: int = 6):
 
     retrieval_miss = []
     gate_or_agent_rejected = []
-    correctly_answered = 0
+    correctly_answered_features = []
 
     print(f"\nChecking {len(test_pos)} test questions...\n")
     for item in test_pos:
         result = pipeline.query(item["question"])
+
+        # Capture features for EVERY question, not just failures -- without
+        # this there's no real baseline to compare a "low" feature value
+        # against, just eyeballing one group in isolation.
+        candidates = hybrid_retrieve(item["question"], pipeline.index, pipeline.embedder, top_k=top_k)
+        features = extract_features(candidates)
+
         if not result.abstained:
-            correctly_answered += 1
+            correctly_answered_features.append(dict(zip(FEATURE_NAMES, [round(f, 4) for f in features])))
             continue
 
         # Wrongly abstained -- was the correct source document even retrieved?
-        candidates = hybrid_retrieve(item["question"], pipeline.index, pipeline.embedder, top_k=top_k)
         source_doc_id = item.get("source_doc_id")
         match = next((c for c in candidates if c.doc_id == source_doc_id), None)
 
         gate = pipeline.agent.sufficiency_gate
-        features = extract_features(candidates)
         gate_probability = gate.score(candidates) if hasattr(gate, "score") else None
 
         record = {
@@ -95,6 +100,8 @@ def diagnose(embedder=None, top_k: int = 6):
             retrieval_miss.append(record)
         else:
             gate_or_agent_rejected.append(record)
+
+    correctly_answered = len(correctly_answered_features)
 
     print("=" * 70)
     print(f"RESULTS  (embedder: {type(pipeline.embedder).__name__})")
@@ -121,23 +128,32 @@ def diagnose(embedder=None, top_k: int = 6):
             print(f"     gate_probability: {r['gate_probability']}  (>= 0.5 needed to pass)")
             print(f"     features: {r['features']}")
 
-        print("\n--- FEATURE COMPARISON: rejected cases vs. calibration positives ---")
-        print("Average feature values across the rejected cases above:")
-        avg_features = {}
+        print("\n--- FEATURE COMPARISON: rejected cases vs. correctly-answered baseline ---")
+        print("Computed directly from this same run's data, not a stale reference from")
+        print("an earlier session -- mean, median, and range for both groups side by side.")
         for name in FEATURE_NAMES:
-            vals = [r["features"][name] for r in gate_or_agent_rejected]
-            avg_features[name] = round(sum(vals) / len(vals), 4)
-        for name, val in avg_features.items():
-            print(f"  {name:28s} {val}")
-        print("Compare each against that same feature's typical value for genuinely")
-        print("answerable questions (see calibration data / README) to spot which")
-        print("specific feature is dragging the gate's decision down despite a")
-        print("strong top1_dense score -- that's the one worth re-engineering.")
+            rejected_vals = sorted(r["features"][name] for r in gate_or_agent_rejected)
+            correct_vals = sorted(f[name] for f in correctly_answered_features)
+            r_mean = round(sum(rejected_vals) / len(rejected_vals), 4)
+            c_mean = round(sum(correct_vals) / len(correct_vals), 4) if correct_vals else None
+            r_med = rejected_vals[len(rejected_vals) // 2]
+            c_med = correct_vals[len(correct_vals) // 2] if correct_vals else None
+            print(f"\n  {name}:")
+            print(f"    rejected  (n={len(rejected_vals):>2}): mean={r_mean:>8}  median={r_med:>8}  "
+                  f"range=[{rejected_vals[0]}, {rejected_vals[-1]}]")
+            if correct_vals:
+                print(f"    correct   (n={len(correct_vals):>2}): mean={c_mean:>8}  median={c_med:>8}  "
+                      f"range=[{correct_vals[0]}, {correct_vals[-1]}]")
+        print("\nA feature genuinely explains the rejections only if its rejected-range and")
+        print("correct-range barely overlap. If the ranges overlap heavily despite a mean")
+        print("difference, the two groups aren't cleanly separated by that feature alone --")
+        print("same lesson as the original HashingEmbedder POS/NEG threshold problem.")
 
     return {
         "feature_importances": feature_importances,
         "correctly_answered": correctly_answered,
         "total": len(test_pos),
+        "correctly_answered_features": correctly_answered_features,
         "retrieval_miss": retrieval_miss,
         "gate_or_agent_rejected": gate_or_agent_rejected,
     }

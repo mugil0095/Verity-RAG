@@ -6,30 +6,28 @@ pickable action instead of a vague standing intention — pick one open item,
 do it, check it off, commit.
 
 ## Status
-- [ ] **Investigate whether the gate over-relies on lexical score for
-  real embeddings** — got the real answer instead of guessing further:
-  `feature_importances_` on the real-embeddings-trained classifier shows
-  `top1_lexical_raw` is the single most relied-on feature (73), ahead of
-  `top3_mean_dense` (67), `top1_dense` (52), `dense_gap_top1_top2` (48) —
-  and `n_candidates_above_floor` scores exactly **0**, definitively
-  confirming the earlier revert (see Done log) was correct, not just
-  cautious. Compare to HashingEmbedder, where `dense_gap_top1_top2` led
-  (71) and lexical was third (51) — lexical's relative importance roughly
-  doubled with real embeddings even though BM25 scoring is completely
-  embedder-independent and unchanged. Plausible mechanism, not yet
-  independently confirmed: the dense features got noisier during
-  calibration (already established — overlapping POS/NEG distributions),
-  so the classifier learned to lean on the one feature that didn't. The
-  rejected cases show a real but imperfect correlation between lower
-  lexical scores and lower gate probability (checked directly, not
-  assumed) — consistent with, but not proof of, this being the actual
-  driver. NOT yet attempted as a fix: changing the feature weighting or
-  gathering a larger/more diverse calibration set. Given the last attempt
-  here (relative floor) looked well-reasoned and turned out to change
-  nothing, the next attempt should get the same empirical treatment before
-  being trusted — build it, run it against real embeddings, compare actual
-  before/after gate probabilities on these exact 7 cases, keep only if it
-  demonstrably moves them.
+- [ ] **`top3_mean_dense` is the real signal — lexical hypothesis retracted.**
+  Ran a proper comparison instead of trusting `feature_importances_` alone:
+  captured feature vectors for all 67 correctly-answered questions too
+  (not just the 7 rejections), and compared actual ranges. `top1_lexical_raw`
+  (the feature flagged last session as most important, 73) turned out NOT
+  to separate the groups — rejected median (17.46) was actually *higher*
+  than correct median (16.06), 69% range overlap. LightGBM's default
+  feature importance mostly reflects split *count*, and an unbounded raw
+  BM25 score naturally gets split on more than a bounded [0,1] one — high
+  importance isn't the same as actually separating classes, worth
+  remembering next time this method gets used. `top3_mean_dense` shows the
+  real separation instead: only 18% range overlap, rejected mean 0.33 vs.
+  correct mean 0.57 — consistent with the original Raouliii finding (one
+  excellent top1 match, weak rank-2/3 support dragging the average down).
+  `n_candidates_above_floor` reconfirmed dead beyond doubt: identical
+  constant `[6.0, 6.0]` range for BOTH groups now, not just the rejections.
+  NOT yet attempted as a fix. Two candidates, both need the same
+  build-then-verify-with-real-embeddings treatment as everything else here
+  before being trusted: (1) a larger calibration set (currently 75+75,
+  explicitly flagged as untried before any feature-engineering guess), or
+  (2) a feature more directly capturing "isolated strong match vs. broad
+  support" than `top3_mean_dense` alone.
 - [ ] **Separately: hybrid ranking sometimes promotes the wrong document**
   — 2 of the 8 wrongly-abstained cases didn't have the correct document at
   rank 1 at all. In one (Tesla gender question), the wrong rank-1 document
@@ -251,3 +249,24 @@ do it, check it off, commit.
   of an already-long investigation -- next attempt (reweighting features
   or a larger calibration set) gets the same build-it-then-verify-with-
   real-embeddings treatment the last one did before being trusted.
+- 2026-08-20 — Retracted the lexical hypothesis from the entry above.
+  Enhanced scripts/diagnose_coverage.py to capture feature vectors for all
+  67 correctly-answered questions, not just the 7 rejections -- without a
+  real baseline, "lexical looks low" was never actually tested against
+  anything. Real comparison: top1_lexical_raw has 69% range overlap
+  between rejected and correct groups, and the rejected median (17.46) is
+  actually HIGHER than the correct median (16.06) -- the opposite of the
+  hypothesis. Root cause of the bad inference: LightGBM's default feature
+  importance mostly reflects split count, and an unbounded raw BM25 score
+  naturally gets split on more than a bounded [0,1] feature regardless of
+  whether any split is actually decisive -- high importance isn't the same
+  as separating the classes. top3_mean_dense is the real signal: only 18%
+  overlap, rejected mean 0.33 vs correct mean 0.57 -- consistent with the
+  original Raouliii finding from two sessions ago (strong top1 match, weak
+  rank-2/3 support). n_candidates_above_floor reconfirmed dead beyond
+  doubt: identical constant [6.0, 6.0] for BOTH groups now, not just the
+  rejections. Two viable next experiments identified, neither attempted
+  yet: decision-threshold tuning on the already-trained classifier
+  (cheapest to test, no retraining needed), or a larger calibration set
+  (already flagged, still untried). Both need the same real-embeddings
+  verification as everything else here before being trusted.
