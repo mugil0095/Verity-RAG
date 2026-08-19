@@ -16,6 +16,7 @@ venv/
 # eval_unanswerable.json) ARE committed for reproducibility without a
 # network fetch.
 data/squad_dev.json
+coverage_diagnosis.json
 
 # OS
 .DS_Store

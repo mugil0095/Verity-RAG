@@ -6,11 +6,37 @@ pickable action instead of a vague standing intention — pick one open item,
 do it, check it off, commit.
 
 ## Status
-- [ ] **Investigate the coverage regression with real embeddings** (96% → 89.3%)
-  — best current explanation is real embeddings underweighting exact
-  vocabulary overlap that SQuAD questions often have with their source
-  sentence, but that's a hypothesis, not confirmed. Look at which of the 8
-  wrongly-abstained questions differ from the 3 under HashingEmbedder.
+- [ ] **Investigate whether the gate over-relies on lexical score for
+  real embeddings** — got the real answer instead of guessing further:
+  `feature_importances_` on the real-embeddings-trained classifier shows
+  `top1_lexical_raw` is the single most relied-on feature (73), ahead of
+  `top3_mean_dense` (67), `top1_dense` (52), `dense_gap_top1_top2` (48) —
+  and `n_candidates_above_floor` scores exactly **0**, definitively
+  confirming the earlier revert (see Done log) was correct, not just
+  cautious. Compare to HashingEmbedder, where `dense_gap_top1_top2` led
+  (71) and lexical was third (51) — lexical's relative importance roughly
+  doubled with real embeddings even though BM25 scoring is completely
+  embedder-independent and unchanged. Plausible mechanism, not yet
+  independently confirmed: the dense features got noisier during
+  calibration (already established — overlapping POS/NEG distributions),
+  so the classifier learned to lean on the one feature that didn't. The
+  rejected cases show a real but imperfect correlation between lower
+  lexical scores and lower gate probability (checked directly, not
+  assumed) — consistent with, but not proof of, this being the actual
+  driver. NOT yet attempted as a fix: changing the feature weighting or
+  gathering a larger/more diverse calibration set. Given the last attempt
+  here (relative floor) looked well-reasoned and turned out to change
+  nothing, the next attempt should get the same empirical treatment before
+  being trusted — build it, run it against real embeddings, compare actual
+  before/after gate probabilities on these exact 7 cases, keep only if it
+  demonstrably moves them.
+- [ ] **Separately: hybrid ranking sometimes promotes the wrong document**
+  — 2 of the 8 wrongly-abstained cases didn't have the correct document at
+  rank 1 at all. In one (Tesla gender question), the wrong rank-1 document
+  had a WEAKER raw semantic score (0.2385) than the correct rank-2 document
+  (0.4756), meaning it won only on lexical score. This is a hybrid-weight
+  or reranker problem, not a gate-calibration one — a different fix,
+  independent of the item above.
 - [ ] **Recover latency without losing stability** — `OMP_NUM_THREADS=1` /
   `MKL_NUM_THREADS=1` fixed a real crash but forces single-threaded
   execution everywhere, inflating the real-embeddings latency cost (p50
@@ -30,6 +56,21 @@ do it, check it off, commit.
   ~430ms/doc against a large index — see README "Design decisions").
 
 ## Done
+- [x] Root-caused and reverted the `n_candidates_above_floor` relative-floor
+  fix — confirmed, twice over, that this feature is dead for real
+  embeddings and safe to leave alone. `scripts/diagnose_coverage.py`
+  categorized the 8 wrongly-abstained real-embeddings questions instead of
+  guessing: 7 of 8 were gate rejections with the correct document already
+  retrieved, often at rank 1 with a strong score — overturning the
+  original "real embeddings underweight vocabulary overlap" hypothesis.
+  Tried a relative floor for `n_candidates_above_floor` (constant at 6.0
+  for every case with the old absolute floor) — empirically confirmed it
+  changed nothing: the classifier's output probability was IDENTICAL
+  before and after for every rejected case (Raouliii's feature value moved
+  6.0→2.0, its probability stayed exactly 0.1448). Reverted cleanly,
+  restoring the original 96%/73.3% baseline exactly. Independently
+  reconfirmed via real `feature_importances_`: exactly **0** on real
+  embeddings, weakest of 5 on HashingEmbedder too.
 - [x] Core pipeline: chunking, hybrid retrieval, LightGBM reranker (ICT
   weak supervision), agent loop, grounding checker, extractive generation
 - [x] Real-time streaming ingestion (thread-safe live index)
@@ -142,6 +183,15 @@ do it, check it off, commit.
   more/smaller evidence sentences instead of fewer/larger chunks per query.
   Updated README "Real embeddings, measured" with the full current numbers
   and explanation. 78 tests passing locally, all green.
+- 2026-08-18 — Fixed the CI workflow: it targeted branch `main`, but the
+  repo's actual default branch is `master`, so CI had silently never run
+  at all since it was written, long before Streamlit or real embeddings
+  existed in this project. Rewrote it for the current state: split into a
+  required fast/deterministic job (excludes the live HuggingFace-download
+  test, which is rate-limit-prone and flaky on shared CI runners) and a
+  separate non-blocking job for that live test, added the OpenMP env vars
+  defensively, added workflow timeouts. Validated by parsing the YAML
+  directly, not just visual review.
 - 2026-08-18 — Simplified CI's Python matrix down to a single version
   after it caused a real, confusing problem: matrix jobs report as
   `test (3.11)` / `test (3.12)`, not `test`, so branch protection's status
@@ -151,3 +201,53 @@ do it, check it off, commit.
   Branch protection enabled on `master` requiring it. CI badge added to
   README. This closes out the CI roadmap item completely: a real,
   currently-running, merge-blocking check, not just a committed YAML file.
+- 2026-08-19 — Built scripts/diagnose_coverage.py to investigate the
+  coverage regression properly instead of guessing. Overturned the
+  original hypothesis: 7 of 8 wrongly-abstained real-embeddings questions
+  had the correct document already retrieved (5 at rank 1, with dense
+  scores from 0.20-0.67 -- a confidence-calibration problem, not a
+  retrieval one. Confirmed one concrete cause: n_candidates_above_floor
+  used a fixed absolute floor (0.08) that was measurably CONSTANT (6.0,
+  every single case) with real embeddings -- a dead feature. Fixed to a
+  relative floor, empirically tuned (0.4, chosen to preserve guard rate)
+  since no fraction tested fully recovered the HashingEmbedder baseline.
+  Real cost, not yet a confirmed win: coverage 96%->90.7%, guard
+  73.3%->70.7% on the DEFAULT path. Deliberately not updating README/other
+  ROADMAP numbers yet -- this trade-off needs real-embeddings confirmation
+  first (does it actually fix the 5 gate-rejected questions?) before
+  deciding whether to keep it. Also found, separately: 2 of 8 cases had
+  the WRONG document outranking the correct one at rank 1 (hybrid-ranking
+  problem, not gate-calibration) -- needs its own investigation.
+- 2026-08-19 — Reverted the relative-floor fix after confirming it doesn't
+  work: ran scripts/diagnose_coverage.py --real-embeddings again and
+  compared probabilities directly. n_candidates_above_floor's value did
+  genuinely change for the Raouliii case (6.0 -> 2.0, proving the fix
+  itself was implemented correctly), but the trained classifier's output
+  probability for that exact case was IDENTICAL before and after (0.1448),
+  as were all 6 other previously-rejected cases (identical to 4 decimal
+  places -- checked programmatically, not eyeballed). The classifier
+  places ~zero weight on this feature regardless of how it's computed, so
+  the fix bought a confirmed regression (coverage 96%->90.7%, guard
+  73.3%->70.7%) for zero confirmed benefit. Reverted cleanly -- confirmed
+  the original 96%/73.3% baseline is restored exactly, and removed the 2
+  tests that were locking in the now-abandoned design. Added real
+  LGBMClassifier.feature_importances_ output to the diagnostic script
+  instead of continuing to infer the driver from correlations -- next
+  real-embeddings run will show directly which feature the trained
+  classifier actually relies on.
+- 2026-08-19 — Got the real feature_importances_ instead of continuing to
+  guess: on the real-embeddings-trained classifier, top1_lexical_raw is
+  the single most relied-on feature (73), ahead of top3_mean_dense (67),
+  top1_dense (52), dense_gap_top1_top2 (48) -- and n_candidates_above_floor
+  scores exactly 0, independently confirming yesterday's revert was
+  correct. Notably different from HashingEmbedder, where dense_gap led
+  (71) and lexical was third (51) -- lexical's relative importance roughly
+  doubled with real embeddings despite BM25 scoring being completely
+  embedder-independent, suggesting the classifier compensates for noisier
+  dense features by leaning on the one signal that didn't get noisier.
+  Plausible, not independently confirmed. Verified the rejected cases show
+  a real but imperfect lexical-score/probability correlation rather than
+  assuming one. Stopping here for today rather than rushing a fix on top
+  of an already-long investigation -- next attempt (reweighting features
+  or a larger calibration set) gets the same build-it-then-verify-with-
+  real-embeddings treatment the last one did before being trusted.
