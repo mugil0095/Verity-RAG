@@ -45,6 +45,20 @@ def extract_features(candidates: list[RetrievedChunk], floor: float = 0.08) -> l
     top3_mean_dense = float(np.mean(dense[:3]))
     top1_lexical_raw = candidates[0].lexical_score
     gap = dense[0] - dense[1] if len(dense) > 1 else dense[0]
+    # REVERTED (2026-08-19): tried a relative floor here to fix a
+    # confirmed-real dead-feature bug (this was CONSTANT at 6.0 for every
+    # real-embeddings question checked with the old absolute floor=0.08).
+    # The relative-floor version was empirically tested and DID change this
+    # feature's value for at least one real case (Raouliii family:
+    # 6.0 -> 2.0) -- but the trained classifier's output probability for
+    # that exact case was IDENTICAL (0.1448) before and after, as were all
+    # 6 other previously-rejected cases (identical to 4 decimal places).
+    # The classifier evidently places ~zero weight on this feature either
+    # way, so "fixing" it bought a confirmed regression on the
+    # HashingEmbedder baseline (coverage 96%->90.7%, guard 73.3%->70.7%)
+    # with zero confirmed benefit to the real problem it targeted. Reverted
+    # rather than kept for a fix that doesn't fix anything. The real driver
+    # of those rejections is still open -- see ROADMAP.md.
     n_above_floor = sum(1 for d in dense if d >= floor)
     return [top1_dense, top3_mean_dense, top1_lexical_raw, gap, float(n_above_floor)]
 
@@ -124,7 +138,7 @@ def train_sufficiency_gate(examples: list[CalibrationExample]) -> CalibratedSuff
         learning_rate=0.1,
         min_child_samples=2,
         verbosity=-1,
-        random_state=42,
+        random_state=42,  # see reranker.py's train_reranker for why this matters
     )
     model.fit(X, y)
     return CalibratedSufficiencyGate(model)
