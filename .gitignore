@@ -17,6 +17,7 @@ venv/
 # network fetch.
 data/squad_dev.json
 coverage_diagnosis.json
+threshold_sweep.json
 
 # OS
 .DS_Store

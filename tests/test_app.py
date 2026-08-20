@@ -96,9 +96,22 @@ def test_demo_tab_shows_correct_before_after_and_abstention_on_unanswerable():
 
 
 def test_reset_button_clears_the_index():
+    """Deliberately uses the lightweight manual-document form, not the full
+    620-doc "Load corpus" button -- Reset's correctness doesn't depend on
+    HOW MUCH is in the index, only that it empties it, and this is the last
+    test in the file: by this point it carries the accumulated memory
+    pressure of every heavier test before it. A real MemoryError from the
+    full corpus showed up here specifically (845 chunks x 65536-dim dense
+    vectors = 422MB) even with conftest.py's gc.collect() between tests --
+    that mitigation measurably helped elsewhere in this file but wasn't
+    enough for the single most cumulative test. Using ~1 chunk instead of
+    845 sidesteps the problem at its actual root for this specific test,
+    without weakening what Reset itself is being tested against."""
     at = AppTest.from_file(str(APP_PATH))
     at.run(timeout=30)
-    [b for b in at.sidebar.button if b.label == "Load corpus + train reranker"][0].click().run(timeout=60)
+    at.sidebar.text_input[0].set_value("Custom Doc")
+    at.sidebar.text_area[0].set_value("A real sentence about quantum computing and qubits.")
+    [b for b in at.sidebar.button if "Ingest" in b.label][0].click().run(timeout=30)
     assert at.session_state.pipeline.index.size() > 0
 
     reset_btn = [b for b in at.sidebar.button if "Reset" in b.label][0]

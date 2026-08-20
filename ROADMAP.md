@@ -22,12 +22,10 @@ do it, check it off, commit.
   excellent top1 match, weak rank-2/3 support dragging the average down).
   `n_candidates_above_floor` reconfirmed dead beyond doubt: identical
   constant `[6.0, 6.0]` range for BOTH groups now, not just the rejections.
-  NOT yet attempted as a fix. Two candidates, both need the same
-  build-then-verify-with-real-embeddings treatment as everything else here
-  before being trusted: (1) a larger calibration set (currently 75+75,
-  explicitly flagged as untried before any feature-engineering guess), or
-  (2) a feature more directly capturing "isolated strong match vs. broad
-  support" than `top3_mean_dense` alone.
+  Decision-threshold tuning also tested and ruled out (see Done log) — the
+  only two untried levers left are a larger calibration set, or a feature
+  that more directly captures "isolated strong match vs. broad support"
+  than `top3_mean_dense` alone.
 - [ ] **Separately: hybrid ranking sometimes promotes the wrong document**
   — 2 of the 8 wrongly-abstained cases didn't have the correct document at
   rank 1 at all. In one (Tesla gender question), the wrong rank-1 document
@@ -54,6 +52,38 @@ do it, check it off, commit.
   ~430ms/doc against a large index — see README "Design decisions").
 
 ## Done
+- [x] **Decision-threshold tuning: tested, no improvement available.** Built
+  `scripts/sweep_threshold.py` to check whether a different cutoff on the
+  already-trained classifier would help, without retraining. Result: a
+  clean, monotonic trade-off curve — checked explicitly, no threshold in
+  [0.10, 0.50] beats the current default (0.5) on BOTH coverage and guard
+  simultaneously. Confirmed the hop-0-only approximation's known gap
+  against real full-pipeline numbers is a stable, expected pattern, not
+  noise: reformulation adds ~+0.05 coverage and costs ~-0.06 guard at the
+  same threshold, consistent in direction and rough magnitude across BOTH
+  HashingEmbedder (approx 0.907/0.773 vs real 0.96/0.733) and real
+  embeddings (approx 0.840/0.893 vs real 0.893/0.827). This is the third
+  hypothesis ruled out by real testing in this investigation
+  (`n_candidates_above_floor`, lexical score, now threshold) — the pattern
+  across all three: the classifier isn't obviously miscalibrated, it's
+  making a reasonable trade-off given its current features/data. The
+  constraint is information available to it, not a bug in how it's used.
+- [x] Fixed a real MemoryError on the actual machine that's been running
+  these evals, not just a theoretical concern: running the full test suite
+  in one pytest process hit crashes from HashingEmbedder's dense 65536-dim
+  vectors accumulating across several heavy tests (`test_app.py` alone
+  does ~5 separate full-corpus loads). Reducing embedding dimensionality
+  and shrinking the regression-test corpus were both tested directly and
+  rejected — the first measurably changes eval numbers (96%→92% coverage
+  at 16384 features), the second nearly destroys the reformulation-drift
+  bug's detectability (0.200 vs 0.050, versus 0.4 vs 0.0 at the current
+  size). Added `tests/conftest.py` (`gc.collect()` after every test) —
+  fixed 2 of 3 original failures, confirmed by real before/after test
+  output, not assumed. The third (`test_reset_button_clears_the_index`,
+  the single most cumulative test, last in its file) needed its own fix:
+  swapped the full-corpus button for the already-tested lightweight
+  manual-document form, since Reset's correctness never depended on how
+  much was in the index. 78 tests passing on the real machine now.
 - [x] Root-caused and reverted the `n_candidates_above_floor` relative-floor
   fix — confirmed, twice over, that this feature is dead for real
   embeddings and safe to leave alone. `scripts/diagnose_coverage.py`
@@ -270,3 +300,21 @@ do it, check it off, commit.
   (cheapest to test, no retraining needed), or a larger calibration set
   (already flagged, still untried). Both need the same real-embeddings
   verification as everything else here before being trusted.
+- 2026-08-20 — Tested decision-threshold tuning: no improvement available.
+  scripts/sweep_threshold.py swept 9 candidate thresholds against the
+  already-trained real-embeddings classifier. Clean, monotonic trade-off
+  curve -- explicitly checked, no threshold beats the current default (0.5)
+  on both coverage AND guard simultaneously. Confirmed the hop-0-only
+  approximation's gap against real numbers is a stable, expected pattern
+  (reformulation adds ~coverage, costs ~guard), consistent across both
+  embedders, not noise. Third hypothesis ruled out by real testing in this
+  investigation -- the classifier isn't miscalibrated, it's making a
+  reasonable trade-off given current features/data.
+- 2026-08-20 — Fixed a real MemoryError on the actual machine running these
+  evals (not the redundant-computation bug from before -- a different,
+  deeper one: base cost of dense vectors accumulating across ~5 heavy
+  tests in one pytest process). Reducing embedding dimensionality and
+  shrinking the regression-test corpus were both tested and rejected, not
+  just assumed risky. gc.collect() (tests/conftest.py) fixed 2 of 3
+  failures, confirmed by real before/after output. The third needed a
+  targeted fix specific to that test. 78 tests passing on the real machine.
