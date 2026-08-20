@@ -1,7 +1,9 @@
 {
+  "embedder": "HashingEmbedder",
+  "generator": "extractive",
   "corpus_docs": 620,
   "corpus_chunks": 845,
-  "ingest_time_sec": 2.091,
+  "ingest_time_sec": 3.665,
   "sufficiency_gate_calibrated": true,
   "calibration_examples": {
     "answerable": 75,
@@ -11,6 +13,7 @@
     "answerable": 75,
     "unanswerable": 75
   },
+  "partial_sample": null,
   "attempted": 72,
   "wrongly_abstained": 3,
   "coverage_rate": 0.96,
@@ -18,6 +21,6 @@
   "avg_grounding_score_on_attempted": 1.0,
   "correctly_abstained_on_unanswerable": 55,
   "hallucination_guard_rate": 0.733,
-  "latency_p50_ms": 171.6,
-  "latency_p95_ms": 635.5
+  "latency_p50_ms": 55.2,
+  "latency_p95_ms": 97.2
 }

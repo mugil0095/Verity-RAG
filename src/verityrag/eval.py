@@ -26,6 +26,21 @@ Run with real neural embeddings instead of the default hashed ones:
          python -m verityrag.eval --real-embeddings
          (needs `pip install sentence-transformers` + internet access for
          the one-time model download -- see embedding.py)
+Run with a real LLM generator instead of the default extractive one:
+         python -m verityrag.eval --real-llm anthropic
+         (no ongoing free tier -- small starter credit only; needs
+         `pip install anthropic` + ANTHROPIC_API_KEY -- see llm_providers.py)
+         python -m verityrag.eval --real-llm gemini
+         (genuine free tier, no card required; needs
+         `pip install google-genai` + GEMINI_API_KEY -- see llm_providers.py)
+Both together:
+         python -m verityrag.eval --real-embeddings --real-llm gemini
+Cap how many test questions get sent to the LLM (per class -- e.g. 8 means
+at most 8 answerable + 8 unanswerable, not 8 total), for when a real
+daily API quota makes the full ~150-question test set infeasible in one
+day (measured directly in practice: 20 requests/day for a brand-new
+free-tier model on a real account):
+         python -m verityrag.eval --real-llm gemini --max-test-questions 8
 """
 from __future__ import annotations
 
@@ -60,6 +75,7 @@ import time
 from pathlib import Path
 
 from .embedding import Embedder
+from .generation import AnswerGenerator
 from .pipeline import VerityRAGPipeline
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
@@ -78,13 +94,38 @@ def _split(items: list, calib_fraction: float, seed: int) -> tuple[list, list]:
 
 
 def run_eval(use_reranker: bool = True, calibrate: bool = True, verbose: bool = True,
-             embedder: Embedder | None = None) -> dict:
+             embedder: Embedder | None = None, generator: AnswerGenerator | None = None,
+             max_test_questions: int | None = None) -> dict:
     """`embedder`: defaults to None, which lets VerityRAGPipeline use its own
     default (HashingEmbedder -- fast, no dependencies, no network). Pass an
     explicit embedder (e.g. SentenceTransformerEmbedder()) to evaluate real
     embedding quality instead -- this is the intended way to measure that
     upgrade's actual impact on coverage/hallucination-guard, rather than
-    changing the pipeline's global default (see ROADMAP.md)."""
+    changing the pipeline's global default (see ROADMAP.md).
+
+    `generator`: same idea, for the answer generator. Defaults to None,
+    which lets VerityRAGPipeline use ExtractiveGenerator (grounded by
+    construction -- can't hallucinate). Pass an LLMGenerator (see
+    generation.py, llm_providers.py) to measure a REAL generator's actual
+    hallucination-guard/grounding behavior instead of the structurally-safe
+    default -- this is the only way to see the grounding checker catch a
+    genuine hallucination rather than a synthetic unit-test one.
+
+    `max_test_questions`: caps how many TEST questions get queried, per
+    class (answerable/unanswerable) -- e.g. 8 means at most 8 answerable +
+    8 unanswerable, 16 total, not 8 total. Only affects the measurement
+    loop -- calibration is untouched and uses its own full split regardless,
+    since calibrate_sufficiency() never calls the generator at all (only
+    hybrid_retrieve + feature extraction), so it costs nothing against an
+    LLM API quota either way. Added specifically because a real free-tier
+    daily quota measured directly in practice (20 requests/day for a
+    brand-new model on a real account) makes the full ~150-question test
+    set genuinely infeasible in one day -- this is how to get a real,
+    honestly-labeled PARTIAL measurement instead of no measurement at all.
+    A smaller sample is less statistically precise than the full set, and
+    the report says so explicitly when this is used (see partial_sample
+    field below) -- this is not a substitute for the full numbers, it's
+    the realistic option a hard quota actually leaves available."""
     corpus = _load("corpus.json")
     eval_answerable = _load("eval_answerable.json")
     eval_unanswerable = _load("eval_unanswerable.json")
@@ -92,7 +133,12 @@ def run_eval(use_reranker: bool = True, calibrate: bool = True, verbose: bool = 
     calib_pos, test_pos = _split(eval_answerable, calib_fraction=0.5, seed=13)
     calib_neg, test_neg = _split(eval_unanswerable, calib_fraction=0.5, seed=13)
 
-    pipeline = VerityRAGPipeline(embedder=embedder)
+    full_test_pos_size, full_test_neg_size = len(test_pos), len(test_neg)
+    if max_test_questions is not None:
+        test_pos = test_pos[:max_test_questions]
+        test_neg = test_neg[:max_test_questions]
+
+    pipeline = VerityRAGPipeline(embedder=embedder, generator=generator)
 
     t0 = time.time()
     pipeline.ingest_documents(corpus)
@@ -141,12 +187,20 @@ def run_eval(use_reranker: bool = True, calibrate: bool = True, verbose: bool = 
 
     report = {
         "embedder": type(pipeline.embedder).__name__,
+        "generator": pipeline.generator.name,
         "corpus_docs": len(corpus),
         "corpus_chunks": pipeline.index.size(),
         "ingest_time_sec": round(ingest_time, 3),
         "sufficiency_gate_calibrated": calibrated,
         "calibration_examples": {"answerable": len(calib_pos), "unanswerable": len(calib_neg)},
         "test_set": {"answerable": len(test_pos), "unanswerable": len(test_neg)},
+        "partial_sample": (
+            {"full_test_set_size": {"answerable": full_test_pos_size, "unanswerable": full_test_neg_size},
+             "note": "Numbers below are from a SMALL SAMPLE, not the full test set -- "
+                     "less statistically precise, not directly comparable to full-set results "
+                     "from a different embedder/generator run."}
+            if max_test_questions is not None else None
+        ),
         "attempted": attempted,
         "wrongly_abstained": wrongly_abstained,
         "coverage_rate": round(attempted / len(test_pos), 3) if test_pos else None,
@@ -172,6 +226,22 @@ if __name__ == "__main__":
         help="Use SentenceTransformerEmbedder instead of the default HashingEmbedder "
              "(needs `pip install sentence-transformers` + internet for the model download)",
     )
+    parser.add_argument(
+        "--real-llm", choices=["anthropic", "gemini"], default=None,
+        help="Use a real LLM API call instead of the default extractive generator. "
+             "'anthropic': needs `pip install anthropic` + ANTHROPIC_API_KEY (no ongoing "
+             "free tier, small starter credit only). 'gemini': needs `pip install "
+             "google-genai` + GEMINI_API_KEY (genuine free tier, no card required -- "
+             "see llm_providers.py). Either makes one real API call per query.",
+    )
+    parser.add_argument(
+        "--max-test-questions", type=int, default=None,
+        help="Cap test questions per class (answerable/unanswerable) -- e.g. 8 means "
+             "at most 8+8=16 total LLM calls, not the full ~150. For when a real daily "
+             "API quota (e.g. a free-tier Gemini limit) makes the full test set "
+             "infeasible in one day. Only affects --real-llm runs in practice -- "
+             "the default extractive generator has no API cost to limit.",
+    )
     args = parser.parse_args()
 
     chosen_embedder = None
@@ -179,4 +249,14 @@ if __name__ == "__main__":
         from .embedding import SentenceTransformerEmbedder
         chosen_embedder = SentenceTransformerEmbedder()
 
-    run_eval(embedder=chosen_embedder)
+    chosen_generator = None
+    if args.real_llm == "anthropic":
+        from .generation import LLMGenerator
+        from .llm_providers import anthropic_complete_fn
+        chosen_generator = LLMGenerator(complete_fn=anthropic_complete_fn)
+    elif args.real_llm == "gemini":
+        from .generation import LLMGenerator
+        from .llm_providers import gemini_complete_fn
+        chosen_generator = LLMGenerator(complete_fn=gemini_complete_fn)
+
+    run_eval(embedder=chosen_embedder, generator=chosen_generator, max_test_questions=args.max_test_questions)
