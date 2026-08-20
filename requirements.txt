@@ -11,4 +11,5 @@ pydantic
 httpx
 streamlit
 sentence-transformers
-transformers
+anthropic
+google-genai
