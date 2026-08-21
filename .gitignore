@@ -18,6 +18,7 @@ venv/
 data/squad_dev.json
 coverage_diagnosis.json
 threshold_sweep.json
+llm_coverage_diagnosis.json
 
 # OS
 .DS_Store
