@@ -19,7 +19,7 @@ from .agent import AgentController, AgentResult
 from .chunking import chunk_document
 from .embedding import Embedder, HashingEmbedder
 from .generation import AnswerGenerator, ExtractiveGenerator
-from .indexing import LiveIndex
+from .indexing import LexicalIndex, LiveIndex
 from .reranker import generate_ict_training_data, train_reranker
 from .retrieval import hybrid_retrieve
 from .sufficiency import CalibrationExample, extract_features, train_sufficiency_gate
@@ -30,10 +30,11 @@ class VerityRAGPipeline:
         self,
         embedder: Embedder | None = None,
         generator: AnswerGenerator | None = None,
+        lexical_index: LexicalIndex | None = None,
         max_hops: int = 2,
     ):
         self.embedder = embedder or HashingEmbedder()
-        self.index = LiveIndex(self.embedder)
+        self.index = LiveIndex(self.embedder, lexical_index=lexical_index)
         self.generator = generator or ExtractiveGenerator()
         self._reranker_model = None
         self.agent = AgentController(

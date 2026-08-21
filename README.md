@@ -53,7 +53,7 @@ flowchart TB
 |---|---|---|
 | Chunking | `chunking.py` | Sentence-aligned, overlapping chunks |
 | Embedding | `embedding.py` | Stateless hashed bag-of-n-grams (default) or a real encoder (opt-in) |
-| Indexing | `indexing.py` | Thread-safe incremental dense + BM25 index |
+| Indexing | `indexing.py`, `elasticsearch_index.py` | Thread-safe incremental dense + BM25 index (pluggable Elasticsearch backend) |
 | Retrieval | `retrieval.py` | Hybrid lexical + dense search |
 | Reranking | `reranker.py` | LightGBM `LGBMRanker`, ICT weak supervision |
 | Sufficiency | `sufficiency.py` | Calibrated classifier: enough evidence to try? |
@@ -107,8 +107,8 @@ update API, so adding documents one at a time rebuilt the entire lexical
 index every call — 61s for the initial corpus. Bulk loading now chunks
 everything first and rebuilds once: 61s → 2.7s. True streaming ingestion
 still rebuilds per document by design (documents need to be searchable
-immediately) at a real cost (~430ms/doc) — the production fix is
-Elasticsearch (see roadmap).
+immediately) at a real cost (~430ms/doc) — `elasticsearch_index.py` is
+the production fix, see below.
 
 **Real embeddings crashed on Windows, twice.** Loading `sentence-transformers`
 (PyTorch) alongside scikit-learn and LightGBM (both MKL-linked) triggered
@@ -186,6 +186,32 @@ python -m verityrag.eval --real-llm gemini --max-test-questions 8
 The report marks this explicitly (`partial_sample` field) — a
 small-sample number is real but less statistically precise than a full
 run.
+
+## Swapping in Elasticsearch
+
+`LexicalIndex` (the `rank_bm25`-based default) has no incremental
+indexing API — adding one document rebuilds the *entire* lexical index
+(see "Design decisions" above). `ElasticsearchLexicalIndex`
+(`elasticsearch_index.py`) is a drop-in swap with genuine incremental
+indexing:
+
+```python
+from verityrag.pipeline import VerityRAGPipeline
+from verityrag.elasticsearch_index import ElasticsearchLexicalIndex
+
+pipeline = VerityRAGPipeline(lexical_index=ElasticsearchLexicalIndex())
+```
+
+Needs `pip install elasticsearch` and a running Elasticsearch instance
+(not bundled — for local dev, disable security in `elasticsearch.yml`
+with `xpack.security.enabled: false` and `discovery.type: single-node`,
+and cap the JVM heap via `config/jvm.options.d/heap.options` rather than
+trusting its default auto-sizing).
+
+Verified via mocked tests against the current `elasticsearch-py` client
+API — a real Elasticsearch instance is running and confirmed reachable,
+but a real end-to-end measurement against it hasn't been run yet; see
+ROADMAP.md.
 
 ## Known limitations
 

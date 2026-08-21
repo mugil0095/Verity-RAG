@@ -35,17 +35,33 @@ class IndexedChunk:
 
 
 class LexicalIndex:
-    """BM25 lexical index. Swap-point for Elasticsearch/OpenSearch in production."""
+    """BM25 lexical index. Swap-point for Elasticsearch/OpenSearch in
+    production -- see elasticsearch_index.py's ElasticsearchLexicalIndex,
+    which implements the same add_batch()/scores() interface but with
+    TRUE incremental indexing, unlike this one (rank_bm25 has no
+    incremental API, so add_batch() here still rebuilds internally on
+    every call -- same cost as before, just renamed to match the shared
+    interface both implementations now expose)."""
 
     def __init__(self):
-        self._tokenized_corpus: list[list[str]] = []
+        self._chunk_ids: list[str] = []
+        self._texts: list[str] = []
         self._bm25: BM25Okapi | None = None
 
-    def rebuild(self, texts: list[str]):
-        self._tokenized_corpus = [_tokenize(t) for t in texts]
-        self._bm25 = BM25Okapi(self._tokenized_corpus) if self._tokenized_corpus else None
+    def add_batch(self, chunk_ids: list[str], texts: list[str]) -> None:
+        self._chunk_ids.extend(chunk_ids)
+        self._texts.extend(texts)
+        tokenized = [_tokenize(t) for t in self._texts]
+        self._bm25 = BM25Okapi(tokenized) if tokenized else None
 
-    def scores(self, query: str) -> np.ndarray:
+    def scores(self, query: str, chunk_ids: list[str]) -> np.ndarray:
+        """`chunk_ids` is accepted for interface compatibility with
+        ElasticsearchLexicalIndex (which genuinely needs it -- ES doesn't
+        guarantee any particular result order beyond relevance ranking)
+        but not used here: this class already tracks documents in the
+        same append order as LiveIndex._chunks, since add_batch() is
+        always called with new chunks in that same order, so its own
+        internal ordering is already correct."""
         if self._bm25 is None:
             return np.zeros(0)
         return np.array(self._bm25.get_scores(_tokenize(query)))
@@ -73,10 +89,10 @@ class LiveIndex:
     process lifetime, with no restart / offline rebuild step.
     """
 
-    def __init__(self, embedder: Embedder):
+    def __init__(self, embedder: Embedder, lexical_index: LexicalIndex | None = None):
         self.embedder = embedder
         self.vector_index = VectorIndex(embedder.dim)
-        self.lexical_index = LexicalIndex()
+        self.lexical_index = lexical_index if lexical_index is not None else LexicalIndex()
         self._chunks: list[IndexedChunk] = []
         self._lock = threading.RLock()
         self.updates_count = 0
@@ -90,8 +106,12 @@ class LiveIndex:
             self.vector_index.add(vectors)
             for c, v in zip(chunks, vectors):
                 self._chunks.append(IndexedChunk(chunk=c, vector=v, indexed_at=now))
-            # BM25 has no incremental API upstream -> cheap full rebuild under lock.
-            self.lexical_index.rebuild([ic.chunk.text for ic in self._chunks])
+            # Only the NEW chunks get passed to add_batch() -- true
+            # incremental indexing when lexical_index is Elasticsearch-
+            # backed. The rank_bm25 default still rebuilds internally on
+            # every call regardless (see LexicalIndex.add_batch), same
+            # cost as the old rebuild()-based design.
+            self.lexical_index.add_batch([c.chunk_id for c in chunks], [c.text for c in chunks])
             self.updates_count += 1
         return len(chunks)
 
