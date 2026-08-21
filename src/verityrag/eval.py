@@ -76,6 +76,7 @@ from pathlib import Path
 
 from .embedding import Embedder
 from .generation import AnswerGenerator
+from .indexing import LexicalIndex
 from .pipeline import VerityRAGPipeline
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
@@ -95,6 +96,7 @@ def _split(items: list, calib_fraction: float, seed: int) -> tuple[list, list]:
 
 def run_eval(use_reranker: bool = True, calibrate: bool = True, verbose: bool = True,
              embedder: Embedder | None = None, generator: AnswerGenerator | None = None,
+             lexical_index: LexicalIndex | None = None,
              max_test_questions: int | None = None) -> dict:
     """`embedder`: defaults to None, which lets VerityRAGPipeline use its own
     default (HashingEmbedder -- fast, no dependencies, no network). Pass an
@@ -110,6 +112,16 @@ def run_eval(use_reranker: bool = True, calibrate: bool = True, verbose: bool = 
     hallucination-guard/grounding behavior instead of the structurally-safe
     default -- this is the only way to see the grounding checker catch a
     genuine hallucination rather than a synthetic unit-test one.
+
+    `lexical_index`: same idea again, for the lexical (BM25) index.
+    Defaults to None, which lets LiveIndex use the rank_bm25-based
+    LexicalIndex (indexing.py) -- no incremental indexing API, full
+    rebuild on every add. Pass an ElasticsearchLexicalIndex
+    (elasticsearch_index.py) to measure whether swapping it in changes
+    any eval numbers at all (it shouldn't -- both are BM25-family scoring
+    -- but "shouldn't" isn't "confirmed" until this is actually run).
+    Needs a real, running Elasticsearch instance -- see README "Swapping
+    in Elasticsearch".
 
     `max_test_questions`: caps how many TEST questions get queried, per
     class (answerable/unanswerable) -- e.g. 8 means at most 8 answerable +
@@ -138,7 +150,7 @@ def run_eval(use_reranker: bool = True, calibrate: bool = True, verbose: bool = 
         test_pos = test_pos[:max_test_questions]
         test_neg = test_neg[:max_test_questions]
 
-    pipeline = VerityRAGPipeline(embedder=embedder, generator=generator)
+    pipeline = VerityRAGPipeline(embedder=embedder, generator=generator, lexical_index=lexical_index)
 
     t0 = time.time()
     pipeline.ingest_documents(corpus)
@@ -188,6 +200,7 @@ def run_eval(use_reranker: bool = True, calibrate: bool = True, verbose: bool = 
     report = {
         "embedder": type(pipeline.embedder).__name__,
         "generator": pipeline.generator.name,
+        "lexical_index": type(pipeline.index.lexical_index).__name__,
         "corpus_docs": len(corpus),
         "corpus_chunks": pipeline.index.size(),
         "ingest_time_sec": round(ingest_time, 3),
@@ -242,12 +255,25 @@ if __name__ == "__main__":
              "infeasible in one day. Only affects --real-llm runs in practice -- "
              "the default extractive generator has no API cost to limit.",
     )
+    parser.add_argument(
+        "--elasticsearch", action="store_true",
+        help="Use ElasticsearchLexicalIndex instead of the default rank_bm25-based "
+             "LexicalIndex (needs `pip install elasticsearch` + a running Elasticsearch "
+             "instance -- see README 'Swapping in Elasticsearch'). Checks whether the "
+             "swap changes any eval numbers (it shouldn't -- BM25-family scoring "
+             "either way).",
+    )
     args = parser.parse_args()
 
     chosen_embedder = None
     if args.real_embeddings:
         from .embedding import SentenceTransformerEmbedder
         chosen_embedder = SentenceTransformerEmbedder()
+
+    chosen_lexical_index = None
+    if args.elasticsearch:
+        from .elasticsearch_index import ElasticsearchLexicalIndex
+        chosen_lexical_index = ElasticsearchLexicalIndex()
 
     chosen_generator = None
     if args.real_llm == "anthropic":
@@ -259,4 +285,5 @@ if __name__ == "__main__":
         from .llm_providers import gemini_complete_fn
         chosen_generator = LLMGenerator(complete_fn=gemini_complete_fn)
 
-    run_eval(embedder=chosen_embedder, generator=chosen_generator, max_test_questions=args.max_test_questions)
+    run_eval(embedder=chosen_embedder, generator=chosen_generator, lexical_index=chosen_lexical_index,
+             max_test_questions=args.max_test_questions)

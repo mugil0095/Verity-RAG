@@ -11,9 +11,9 @@ questions through a bounded multi-hop retrieval agent, and refuses to answer
 rather than hallucinate when it doesn't have grounded evidence.
 
 ```
-Coverage on real answerable questions:        96.0%
-Correctly abstained on held-out-topic Qs:      73.3%   (the hallucination guard)
-Query latency:                                 p50 ~55ms / p95 ~97ms
+Coverage on real answerable questions:        93.3%
+Correctly abstained on held-out-topic Qs:      77.3%   (the hallucination guard)
+Query latency:                                 p50 ~58ms / p95 ~88ms
 ```
 Full numbers in [`eval_report.json`](eval_report.json), reproducible with `python -m verityrag.eval`.
 
@@ -88,6 +88,20 @@ hashed vectors have no IDF weighting — stopwords swamped the topical
 signal until filtering was added. A real encoder (`SentenceTransformerEmbedder`)
 is available as an opt-in swap behind the same interface — see below.
 
+**The lexical tokenizer didn't strip punctuation.** Found while comparing
+against Elasticsearch (see "Swapping in Elasticsearch" below): `rank_bm25`'s
+tokenizer was `text.lower().split()` — pure whitespace splitting, so
+`"Tesla,"` and `"Tesla"` were different tokens and would never match each
+other. Elasticsearch's default analyzer strips punctuation correctly, and
+swapping it in changed real eval numbers (guard 73.3% → 78.7%) despite both
+being BM25-family scoring — that gap is what surfaced the bug. Fixed to a
+proper regex tokenizer; closed ~74% of the original gap. Real, honest
+trade-off: guard improved (73.3% → 77.3%) but coverage dropped slightly
+(96% → 93.3%) — some of the old broken tokenizer's punctuation-attached
+matches were apparently helping a couple of answerable questions pass the
+sufficiency gate by accident. Kept the fix regardless, since correct
+tokenization isn't optional just because a bug happened to help sometimes.
+
 **A single relevance threshold doesn't separate answerable from
 unanswerable questions.** On-topic and off-topic-but-keyword-overlapping
 questions had heavily overlapping score distributions — no one number
@@ -99,7 +113,7 @@ retry logic (expand the query using the best candidate so far) assumes
 the first pass found something relevant to refine. For genuinely
 out-of-domain questions it pulled the search toward a wrong match instead
 of away from it. Hallucination guard was 9.3% with unconditional
-reformulation, 73.3% once reformulation was gated on the sufficiency
+reformulation, 77.3% once reformulation was gated on the sufficiency
 classifier's own confidence. Locked in with a regression test.
 
 **Bulk ingestion was accidentally O(n²).** `rank_bm25` has no incremental
@@ -126,19 +140,25 @@ real embeddings pay a latency tax beyond what CPU inference alone costs.
 
 | Metric | HashingEmbedder (default) | SentenceTransformerEmbedder |
 |---|---|---|
-| Coverage | 96% | 89.3% |
-| Hallucination guard | 73.3% | **82.7%** |
-| Keyword hit rate | 68.1% | 70.1% |
-| Avg grounding score | 1.0 | 1.0 |
-| Latency, p50 | ~50ms | ~1,764ms |
+| Coverage | 93.3% | 89.3%* |
+| Hallucination guard | 77.3% | **82.7%**\* |
+| Keyword hit rate | 67.1% | 70.1%* |
+| Avg grounding score | 1.0 | 1.0* |
+| Latency, p50 | ~58ms | ~1,764ms* |
 
-Not a clean win. The real encoder closes a meaningful chunk of the
-hallucination-guard gap, but coverage drops ~7 points and latency
-increases ~35x — part of that from the Windows workaround above, part
-from matching evidence at sentence granularity instead of whole chunks
-(a separate fix: comparing a claim against a whole multi-sentence chunk
-diluted its similarity score, so a claim could score 1.0 against its own
-source sentence in isolation but only 0.41 against the chunk containing
+\* The `SentenceTransformerEmbedder` column was measured before a real
+tokenizer bug in the shared lexical index was found and fixed (see
+"Design decisions" above) — both embedders use the same `rank_bm25`
+lexical scoring underneath, so this column may shift slightly too. Not
+yet re-verified; needs a fresh `--real-embeddings` run to confirm.
+
+Not a clean win even before that caveat. The real encoder closes a
+meaningful chunk of the hallucination-guard gap, but coverage drops and
+latency increases ~30x — part of that from the Windows workaround above,
+part from matching evidence at sentence granularity instead of whole
+chunks (a separate fix: comparing a claim against a whole multi-sentence
+chunk diluted its similarity score, so a claim could score 1.0 against its
+own source sentence in isolation but only 0.41 against the chunk containing
 it). Best explanation for the remaining coverage gap: SQuAD questions are
 often near-paraphrases of their source text, which favors the hash-based
 lexical matching a neural encoder doesn't lean on as hard.
@@ -208,10 +228,22 @@ with `xpack.security.enabled: false` and `discovery.type: single-node`,
 and cap the JVM heap via `config/jvm.options.d/heap.options` rather than
 trusting its default auto-sizing).
 
-Verified via mocked tests against the current `elasticsearch-py` client
-API — a real Elasticsearch instance is running and confirmed reachable,
-but a real end-to-end measurement against it hasn't been run yet; see
-ROADMAP.md.
+Measured against a real, running instance, not just mocks — two honest
+findings, neither the "obvious" one. First, eval numbers weren't
+identical between the two lexical backends despite both being BM25-family
+scoring: comparing them is what surfaced the tokenizer bug described in
+"Design decisions" above. Second, at this project's actual corpus size
+(845 chunks), Elasticsearch is not faster: `rank_bm25`'s full rebuild
+measured 206.0ms/doc median vs. Elasticsearch's 221.7ms/doc — Elasticsearch
+is *slower* here, not the clean win the architecture would suggest.
+Elasticsearch's fixed per-call overhead (a network round-trip plus an
+explicit index refresh, required for real-time visibility — see
+`elasticsearch_index.py`) apparently exceeds rank_bm25's actual rebuild
+cost at this scale. The architectural principle remains sound — `rank_bm25`'s
+cost grows with corpus size, Elasticsearch's doesn't — but the crossover
+point where that pays off measurably hasn't been reached by this specific
+corpus. Reported honestly rather than only measuring at a scale picked to
+make the swap look good.
 
 ## Known limitations
 
@@ -220,7 +252,7 @@ Tracked as an actual backlog in [ROADMAP.md](ROADMAP.md).
 - **Extractive generation by default** trades fluent prose for a
   structural guarantee against hallucination — `LLMGenerator` swaps this
   for a real model when you want it.
-- **73.3% hallucination-guard rate by default, not 100%** — reported
+- **77.3% hallucination-guard rate by default, not 100%** — reported
   honestly. A real embedder closes part of this gap at a real latency
   cost (see above).
 - **Streaming throughput** is bounded by the BM25 rebuild cost described

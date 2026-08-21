@@ -1,9 +1,10 @@
 {
   "embedder": "HashingEmbedder",
   "generator": "extractive",
+  "lexical_index": "LexicalIndex",
   "corpus_docs": 620,
   "corpus_chunks": 845,
-  "ingest_time_sec": 3.665,
+  "ingest_time_sec": 2.794,
   "sufficiency_gate_calibrated": true,
   "calibration_examples": {
     "answerable": 75,
@@ -14,13 +15,13 @@
     "unanswerable": 75
   },
   "partial_sample": null,
-  "attempted": 72,
-  "wrongly_abstained": 3,
-  "coverage_rate": 0.96,
-  "keyword_hit_rate_on_attempted": 0.681,
+  "attempted": 70,
+  "wrongly_abstained": 5,
+  "coverage_rate": 0.933,
+  "keyword_hit_rate_on_attempted": 0.671,
   "avg_grounding_score_on_attempted": 1.0,
-  "correctly_abstained_on_unanswerable": 55,
-  "hallucination_guard_rate": 0.733,
-  "latency_p50_ms": 55.2,
-  "latency_p95_ms": 97.2
+  "correctly_abstained_on_unanswerable": 58,
+  "hallucination_guard_rate": 0.773,
+  "latency_p50_ms": 58.3,
+  "latency_p95_ms": 82.1
 }
