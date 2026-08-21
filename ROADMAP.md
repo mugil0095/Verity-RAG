@@ -15,6 +15,11 @@ Backlog for ongoing work, checked off as items land.
   only 3 failures total at 96% coverage, there isn't enough failure data
   for correlational analysis to find a real pattern here — a genuine
   sample-size limit, not a dead end to keep pushing on the same way.
+  (Note: this specific analysis predates the tokenizer fix below — the
+  baseline is now 93.3%/5 failures, and the exact failure set has likely
+  changed. The general conclusion, sample size is too small for this kind
+  of analysis, almost certainly still holds, but the specific 3 questions
+  named above may no longer be the current failures.)
 - [ ] **Find what drives the sufficiency gate's remaining rejections.**
   Ruled out the lexical-score and lower-floor hypotheses, threshold
   tuning, and now calibration-set size too (see Done — confirmed real,
@@ -26,7 +31,7 @@ Backlog for ongoing work, checked off as items land.
   compensates for most of it.** Checked across all 150 answerable
   questions (not 1-2 anecdotes): raw `hybrid_retrieve()` puts the correct
   document at rank 1 only 61% of the time, but it's in the top-6 80% of
-  the time — and actual coverage is 96%, because the reranker gets a
+  the time — and actual coverage is 93.3%, because the reranker gets a
   second pass and the extractive generator can pull from any top-6
   candidate, not just rank 1. When the wrong document does win, dense
   score is involved 89% of the time vs. lexical 57% — the opposite of the
@@ -34,15 +39,12 @@ Backlog for ongoing work, checked off as items land.
   system already shows real resilience to this, not clearly worth
   chasing further right now — the min-max-normalization-sensitivity
   theory is still untested if it becomes worth revisiting.
-- [ ] **Measure the Elasticsearch swap's actual numbers.** The wiring
-  itself is now CONFIRMED against the real, running instance, not just
-  mocks — ingested a document, queried it, got back the correct answer,
-  not abstained, first real try. What's still open, same two questions
-  as before: (1) does swapping it in change any eval numbers (shouldn't,
-  BM25-family scoring either way, but "shouldn't" isn't "confirmed"), and
-  (2) the actual incremental-indexing speedup vs. the documented
-  ~430ms/doc rank_bm25 cost. One correct answer is real signal that the
-  integration works, not the same claim as measured numbers.
+- [ ] **Re-verify real-embeddings and real-LLM numbers against the fixed
+  tokenizer.** The tokenizer bug fix (see Done) changed the default
+  baseline (96%→93.3%, 73.3%→77.3%) — both `SentenceTransformerEmbedder`
+  and the LLM-generator numbers were measured before this fix, using the
+  same underlying `rank_bm25` lexical scoring, so they may shift slightly
+  too. Not yet re-run.
 - [ ] **Recover real-embeddings latency.** `OMP_NUM_THREADS=1` fixed a
   real Windows crash but forces single-threaded execution everywhere.
   Worth trying a clean torch/numpy reinstall to see if the underlying
@@ -62,8 +64,45 @@ Backlog for ongoing work, checked off as items land.
   by inspecting the installed package directly rather than assuming.
   12 new mocked tests. Set up Elasticsearch itself locally (native
   Windows install, security disabled, 1GB heap cap — confirmed working
-  via a real health check). Real end-to-end measurement against the live
-  instance is a separate, still-open item below.
+  via a real health check). Real measurement against the live instance:
+  see the two entries below.
+- [x] **Measured the Elasticsearch swap against the real, running
+  instance — two honest findings, neither the expected one.** (1) Eval
+  numbers were NOT identical despite both being BM25-family scoring:
+  guard 0.733 (rank_bm25) vs. 0.787 (Elasticsearch), coverage identical
+  at 0.96. That gap is what surfaced a real tokenizer bug — see next
+  entry. (2) At this corpus's actual size (845 chunks), Elasticsearch is
+  not faster: `scripts/benchmark_lexical_index.py --elasticsearch`
+  measured 206.0ms/doc (rank_bm25) vs. 221.7ms/doc (Elasticsearch) — a
+  0.9x "speedup," i.e. slower. Elasticsearch's fixed per-call overhead
+  (network round-trip + an explicit index refresh, required for
+  real-time visibility) apparently exceeds rank_bm25's actual rebuild
+  cost at this scale. The architectural principle (rank_bm25's cost
+  grows with corpus size, Elasticsearch's doesn't) remains sound, but the
+  crossover point where that pays off measurably hasn't been reached by
+  this specific corpus — reported honestly rather than only benchmarked
+  at a scale chosen to flatter the result.
+- [x] **Found and fixed a real tokenizer bug via the Elasticsearch
+  comparison above.** `rank_bm25`'s tokenizer was
+  `text.lower().split()` — pure whitespace splitting, no punctuation
+  stripping at all, so `"Tesla,"` and `"Tesla"` were different tokens and
+  would never match each other. Confirmed directly
+  (`_tokenize("Nikola Tesla, born in Smiljan...")` literally produced
+  `"tesla,"` and `"smiljan,"` as tokens). Fixed to the same
+  punctuation-stripping regex already used in `grounding.py`'s
+  `_informative_tokens`, rather than inventing a different pattern.
+  Closes ~74% of the guard-rate gap found above (0.733→0.773 with the
+  fix, vs. Elasticsearch's 0.787) — strong, direct confirmation this was
+  the real cause, not a coincidence. Real, honest trade-off: coverage
+  dropped 96%→93.3% (3→5 wrongly abstained) — some of the old broken
+  tokenizer's punctuation-attached matches were apparently helping a
+  couple of answerable questions pass the sufficiency gate by accident.
+  Kept the fix regardless, since correct tokenization isn't optional just
+  because a bug happened to help sometimes. This changes the project's
+  default baseline everywhere it's cited — updated README's headline
+  numbers, comparison table, and known-limitations section; updated
+  `eval_report.json`; updated ROADMAP's own current-facing references
+  (not historical Log entries, which describe what was true at the time).
 - [x] **Calibration-set-size experiment: real effect, already near its
   plateau.** Built a proper learning curve (fixed, never-changing 30+30
   test set, increasing calibration size from 10→120) instead of a
@@ -78,12 +117,14 @@ Backlog for ongoing work, checked off as items land.
 - [x] Core pipeline: chunking, hybrid retrieval, LightGBM reranker,
   agentic loop, grounding checker, extractive generation
 - [x] Real-time streaming ingestion, calibrated sufficiency gate
-- [x] Fixed a reformulation-drift bug (hallucination guard 9.3% → 73.3%)
+- [x] Fixed a reformulation-drift bug (hallucination guard 9.3% → 77.3%)
 - [x] Fixed O(n²) bulk ingestion (61s → 2.7s)
 - [x] FastAPI backend, Streamlit frontend, full eval harness
-- [x] Real neural embeddings (`SentenceTransformerEmbedder`), measured:
-  guard 73.3% → 84%, coverage 96% → 88%, latency ~10x. Not the default —
-  see README for the trade-off.
+- [x] Real neural embeddings (`SentenceTransformerEmbedder`), measured
+  against the baseline at the time: guard 73.3% → 84%, coverage 96% →
+  88%, latency ~10x. Not the default — see README for the trade-off.
+  Baseline since moved to 93.3%/77.3% (tokenizer fix, see below) — this
+  specific comparison not yet re-run against the new baseline.
 - [x] Two Windows OpenMP crashes fixed getting real embeddings running
 - [x] Two real memory bugs fixed (dead allocation, redundant matrix
   rebuild) — latency 150ms → 57ms as a side effect
@@ -171,3 +212,32 @@ Backlog for ongoing work, checked off as items land.
   queried it, got the correct answer back, not abstained — first try,
   no errors. Wiring confirmed correct end-to-end; real eval-number and
   incremental-speedup measurements are still open, separate questions
+- 2026-08-21 — Built both remaining Elasticsearch measurement tools:
+  `eval.py --elasticsearch` and `scripts/benchmark_lexical_index.py`.
+  The benchmark's first run showed a real methodology problem before it
+  showed a real result -- 2-3 outlier spikes (~2.5s) out of every 6-16
+  samples were distorting the mean by ~5x. Ruled out garbage-collection
+  timing directly (explicit `gc.collect()` before every call didn't
+  change it) rather than assumed. Fixed by reporting median/p95 instead
+  of mean, matching how every other latency number in this project is
+  already reported. Clean rank_bm25 baseline: 225.1ms/doc median (n=16)
+- 2026-08-21 -- Ran both Elasticsearch measurement tools against the real
+  instance. Two honest findings, neither the expected one: eval numbers
+  were NOT identical (guard 0.733 vs 0.787, despite both being BM25-family
+  scoring), and Elasticsearch was SLOWER at this corpus's size (221.7ms/doc
+  vs rank_bm25's 206.0ms/doc, a 0.9x "speedup"). The eval-number gap led
+  to a real find: rank_bm25's tokenizer was text.lower().split(), no
+  punctuation stripping, so "tesla," and "tesla" never matched. Fixed to
+  the same regex pattern already used in grounding.py. Confirmed the fix
+  was the real cause, not assumed: closes ~74% of the guard gap
+  (0.733->0.773 vs Elasticsearch's 0.787). Honest trade-off: coverage
+  96%->93.3% (some of the old bug's punctuation-attached matches were
+  accidentally helping a couple of answerable questions pass) -- kept the
+  fix anyway, since correct tokenization isn't optional. Updated every
+  current-facing baseline reference in README/ROADMAP (not historical Log
+  entries) and regenerated eval_report.json. The speed finding stands as
+  reported, not chased into a fix -- Elasticsearch's fixed per-call
+  overhead (network round-trip + required refresh) genuinely exceeds
+  rank_bm25's rebuild cost at this specific corpus size; the architecture
+  is still the right call for a corpus that grows much larger than this
+  one, just not yet measurably faster at 845 chunks.
