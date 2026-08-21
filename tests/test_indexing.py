@@ -33,7 +33,7 @@ def test_lexical_index_finds_keyword_match():
     index = LiveIndex(HashingEmbedder(n_features=2048))
     index.add_chunks(_sample_chunks())  # Eiffel Tower passage
     index.add_chunks(chunk_document("d2", "Unrelated", "Photosynthesis converts sunlight into chemical energy in plants."))
-    scores = index.lexical_index.scores("Gustave Eiffel engineer tower")
+    scores = index.lexical_index.scores("Gustave Eiffel engineer tower", [ic.chunk.chunk_id for ic in index.snapshot()])
     assert scores.size == index.size()
     eiffel_chunk_positions = [i for i, ic in enumerate(index.snapshot()) if ic.chunk.doc_id == "d1"]
     other_positions = [i for i, ic in enumerate(index.snapshot()) if ic.chunk.doc_id == "d2"]
@@ -42,7 +42,7 @@ def test_lexical_index_finds_keyword_match():
 
 def test_empty_index_lexical_scores_empty():
     index = LiveIndex(HashingEmbedder(n_features=2048))
-    scores = index.lexical_index.scores("anything")
+    scores = index.lexical_index.scores("anything", [])
     assert scores.size == 0
 
 

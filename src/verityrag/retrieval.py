@@ -56,7 +56,7 @@ def hybrid_retrieve(
     if not snapshot:
         return []
 
-    lexical_scores = index.lexical_index.scores(query)
+    lexical_scores = index.lexical_index.scores(query, [ic.chunk.chunk_id for ic in snapshot])
     query_vec = embedder.embed([query])
     dense_scores = cosine_sim_matrix(query_vec, doc_vecs)[0]
 

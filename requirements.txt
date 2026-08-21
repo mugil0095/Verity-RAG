@@ -13,3 +13,4 @@ streamlit
 sentence-transformers
 anthropic
 google-genai
+elasticsearch
