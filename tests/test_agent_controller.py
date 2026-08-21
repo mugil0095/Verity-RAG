@@ -40,6 +40,44 @@ def test_agent_abstains_when_no_relevant_evidence_exists():
     result = agent.answer("What is the boiling point of liquid helium on Europa?")
     assert result.abstained is True
     assert result.answer is None
+    assert result.raw_generated_text is None  # generation never ran -- gate rejected before that
+
+
+def test_raw_generated_text_preserved_when_grounding_rejects_but_answer_stays_none():
+    """The actual point of this field: distinguishing 'gate rejected before
+    generation ran' from 'generation ran but grounding rejected it' --
+    these need different fixes, and both look identical (answer=None) from
+    outside without this. `answer` itself must NOT change behavior -- this
+    is a safety-relevant guarantee (an ungrounded answer must never be
+    exposed as if it were trusted), so this test locks in that it's still
+    None on grounding rejection, exactly as before this field existed."""
+    class FakeUngroundedGenerator:
+        name = "fake"
+
+        def generate(self, query, evidence, embedder):
+            from verityrag.generation import GeneratedAnswer
+            return GeneratedAnswer(
+                text="A completely unrelated made-up answer with no connection to the evidence.",
+                used_chunk_ids=[c.chunk_id for c in evidence],
+                generator="fake",
+            )
+
+    embedder = HashingEmbedder(n_features=4096)
+    index = LiveIndex(embedder)
+    for doc_id, title, text in DOCS:
+        index.add_chunks(chunk_document(doc_id, title, text, max_tokens=60))
+    agent = AgentController(
+        index=index, embedder=embedder, generator=FakeUngroundedGenerator(),
+        max_hops=2, sufficiency_gate=SufficiencyGate(threshold=0.15),
+        grounding_abstain_threshold=0.5,
+    )
+
+    result = agent.answer("What is Nikola Tesla known for?")
+
+    assert result.abstained is True
+    assert result.answer is None  # unchanged safety behavior -- never expose a rejected answer here
+    assert result.raw_generated_text is not None
+    assert "unrelated made-up answer" in result.raw_generated_text  # the actual generated text, preserved
 
 
 def test_agent_abstains_on_empty_index():

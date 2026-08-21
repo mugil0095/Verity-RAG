@@ -49,6 +49,19 @@ class AgentResult:
     hops_used: int
     abstained: bool
     trace: list[AgentStep] = field(default_factory=list)
+    # Set whenever generation actually ran, regardless of the grounding
+    # outcome -- unlike `answer` (which stays None on ANY abstain, by
+    # design, so a rejected answer is never accidentally exposed as if it
+    # were trusted), this shows what the generator actually produced even
+    # when grounding rejected it. Exists specifically for diagnosing WHY
+    # a real LLM generator's coverage is lower than the extractive
+    # default's: was the question rejected before generation even ran
+    # (retrieval/gate issue, unrelated to the generator), or did the LLM
+    # generate something that then failed the grounding check (a real
+    # question about whether its phrasing under-scores on grounding even
+    # when factually correct)? `answer` alone can't distinguish these --
+    # both look identical (None) from the outside.
+    raw_generated_text: str | None = None
 
 
 class AgentController:
@@ -150,10 +163,11 @@ class AgentController:
             trace.append(AgentStep(hop=len(trace), query_used=current_query, n_candidates=0,
                                     top_score=0.0, action="abstain"))
             return AgentResult(query=query, answer=None, grounding=report, evidence=best_candidates,
-                                hops_used=len(trace), abstained=True, trace=trace)
+                                hops_used=len(trace), abstained=True, trace=trace,
+                                raw_generated_text=generated.text)
 
         trace.append(AgentStep(hop=len(trace), query_used=current_query, n_candidates=0,
                                 top_score=0.0, action="answer"))
         return AgentResult(query=query, answer=generated.text, grounding=report,
                             evidence=best_candidates, hops_used=len(trace),
-                            abstained=False, trace=trace)
+                            abstained=False, trace=trace, raw_generated_text=generated.text)

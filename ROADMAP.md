@@ -3,14 +3,18 @@
 Backlog for ongoing work, checked off as items land.
 
 ## Status
-- [ ] **Investigate why the LLM generator's coverage is lower than
-  expected.** First small-sample run (n=8+8, `gemini-3.6-flash`): guard
-  100%, but coverage only 50% — both attempted answers scored a perfect
-  1.0 on grounding, so the other 4 failed upstream, either at the
-  sufficiency gate or the post-generation grounding check. Guess, not
-  confirmed: an LLM's paraphrased answer may score lower on grounding
-  than the extractive generator's verbatim copy-paste, even when correct.
-  Needs a larger sample or per-question detail to actually confirm.
+- [ ] **Retrieval fails to surface the right chunk among many
+  topically-similar ones for broad topics.** Traced the LLM-generator
+  coverage gap to its actual root, not the paraphrase theory guessed
+  earlier (that's now ruled out — checked directly, the LLM's rejected
+  answers were honest "I don't know"s, not reworded correct ones). Both
+  grounding-rejected cases from a real run: the gold-answer chunk simply
+  wasn't in the top-6 retrieved candidates at all, for questions about
+  Super Bowl 50 (a broad topic spanning many separate chunks). Same
+  failure would hit the extractive generator too — it just can't say "I
+  don't know," so it silently produces a wrong answer instead of an
+  honest abstention. Connects directly to the two items below rather than
+  being a separate LLM-specific issue.
 - [ ] **Find what drives the sufficiency gate's remaining rejections.**
   Ruled out the lexical-score and lower-floor hypotheses, and threshold
   tuning (no cutoff beats the current default on both coverage and
@@ -89,3 +93,10 @@ Backlog for ongoing work, checked off as items land.
   `--max-test-questions` for a feasible partial eval
 - 2026-08-20 — First complete real-LLM run: guard 100%, coverage 50%
   on n=8+8 — coverage gap needs investigating
+- 2026-08-20 — Added `AgentResult.raw_generated_text` (visible even when
+  grounding rejects, unlike `answer`) and a diagnostic script to trace
+  exactly why. Ran it for real: both rejected cases were the LLM
+  correctly saying "I don't know" for evidence that was never actually
+  retrieved (checked directly — the gold-answer chunk wasn't in the
+  top-6). Paraphrase hypothesis retracted; this is a retrieval gap on
+  broad, many-chunk topics, not an LLM or grounding-checker issue
