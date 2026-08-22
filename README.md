@@ -140,28 +140,29 @@ real embeddings pay a latency tax beyond what CPU inference alone costs.
 
 | Metric | HashingEmbedder (default) | SentenceTransformerEmbedder |
 |---|---|---|
-| Coverage | 93.3% | 89.3%* |
-| Hallucination guard | 77.3% | **82.7%**\* |
-| Keyword hit rate | 67.1% | 70.1%* |
-| Avg grounding score | 1.0 | 1.0* |
-| Latency, p50 | ~58ms | ~1,764ms* |
+| Coverage | 93.3% | 92% |
+| Hallucination guard | 77.3% | **96%** |
+| Keyword hit rate | 67.1% | 76.8% |
+| Avg grounding score | 1.0 | 1.0 |
+| Latency, p50 | ~58ms | ~2,175ms |
 
-\* The `SentenceTransformerEmbedder` column was measured before a real
-tokenizer bug in the shared lexical index was found and fixed (see
-"Design decisions" above) — both embedders use the same `rank_bm25`
-lexical scoring underneath, so this column may shift slightly too. Not
-yet re-verified; needs a fresh `--real-embeddings` run to confirm.
+Re-verified after the tokenizer fix (see "Design decisions" above) — and
+the effect was much larger here than for the default path (guard
+73.3%→77.3% there, vs. 82.7%→96% here). That's not a coincidence: the
+real-embeddings-trained sufficiency classifier relies on lexical score as
+its single most important feature (confirmed directly via
+`feature_importances_` — see ROADMAP.md), more than the `HashingEmbedder`
+classifier does. A bug in exactly that layer naturally hit the classifier
+that depends on it most. Unlike the default path, every metric improved
+together here — no coverage/guard trade-off this time.
 
-Not a clean win even before that caveat. The real encoder closes a
-meaningful chunk of the hallucination-guard gap, but coverage drops and
-latency increases ~30x — part of that from the Windows workaround above,
-part from matching evidence at sentence granularity instead of whole
-chunks (a separate fix: comparing a claim against a whole multi-sentence
-chunk diluted its similarity score, so a claim could score 1.0 against its
-own source sentence in isolation but only 0.41 against the chunk containing
-it). Best explanation for the remaining coverage gap: SQuAD questions are
-often near-paraphrases of their source text, which favors the hash-based
-lexical matching a neural encoder doesn't lean on as hard.
+A real encoder still closes a meaningful chunk of the hallucination-guard
+gap on its own terms, and latency is still the real cost — part of that
+from the Windows workaround above, part from matching evidence at
+sentence granularity instead of whole chunks (a separate fix: comparing a
+claim against a whole multi-sentence chunk diluted its similarity score,
+so a claim could score 1.0 against its own source sentence in isolation
+but only 0.41 against the chunk containing it).
 
 This is why it isn't the pipeline default — for a system positioned as
 real-time, the latency cost isn't currently justified by the guard
@@ -191,9 +192,19 @@ pipeline = VerityRAGPipeline(generator=LLMGenerator(complete_fn=gemini_complete_
 Confirmed working end-to-end against the live Gemini API — a real query
 answered correctly and passed the grounding check; a deliberately
 unrelated response was correctly caught and abstained. First small-sample
-run (n=8+8): hallucination guard **100%**, coverage 50% (both attempted
-answers scored a perfect 1.0 on grounding — the coverage gap is an open
-question, tracked in ROADMAP.md, not yet explained). The free tier's
+run (n=8+8): hallucination guard **100%**, coverage 50%. Traced the
+coverage gap directly rather than leaving it unexplained: both
+wrongly-abstained cases were the LLM honestly saying it couldn't find the
+answer in what was actually retrieved — checked the raw retrieved
+candidates directly, the gold-answer chunk genuinely wasn't in the top-6.
+A retrieval gap, not an LLM or grounding-checker problem (see ROADMAP.md).
+Re-run after the tokenizer fix (see "Design decisions" above): coverage
+and guard unchanged exactly (0.5, 1.0) — the one number that moved
+(avg grounding score, 1.0→0.875) is fully explained by simple arithmetic
+on 4 attempted questions (three at 1.0, one at 0.5), within the run-to-run
+noise already expected here — LLM generation isn't perfectly
+deterministic, confirmed earlier by this same 8-question sample producing
+a different success count on an unrelated prior run. The free tier's
 daily quota is real and can be quite restrictive for a new model (a live
 429 showed a 20-request/day cap), so the full 150-question eval doesn't
 fit in one day. `--max-test-questions N` caps how many questions actually
