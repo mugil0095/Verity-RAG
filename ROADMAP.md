@@ -4,22 +4,18 @@ Backlog for ongoing work, checked off as items land.
 
 ## Status
 - [ ] **Retrieval sometimes fails to surface the right chunk — cause still
-  unclear.** Traced the LLM-generator coverage gap to a genuine retrieval
-  miss, not the paraphrase theory guessed earlier (ruled out — the LLM's
-  rejected answers were honest "I don't know"s, not reworded correct
-  ones; the gold chunk wasn't in the top-6 at all). Tested whether "broad
-  topic, many chunks" explains it, using the full deterministic baseline
-  rather than 2 anecdotal cases: doesn't hold up cleanly. Only 1 of the 3
-  default-baseline failures (Nikola_Tesla, 92 docs) is from an
-  above-median topic; Normans (45 docs) is actually below median. With
-  only 3 failures total at 96% coverage, there isn't enough failure data
-  for correlational analysis to find a real pattern here — a genuine
-  sample-size limit, not a dead end to keep pushing on the same way.
-  (Note: this specific analysis predates the tokenizer fix below — the
-  baseline is now 93.3%/5 failures, and the exact failure set has likely
-  changed. The general conclusion, sample size is too small for this kind
-  of analysis, almost certainly still holds, but the specific 3 questions
-  named above may no longer be the current failures.)
+  unclear.** Re-ran against the current, tokenizer-fixed code rather than
+  trust the stale 3-failure analysis — confirmed the failure set genuinely
+  changed (now 5 failures matching 93.3% coverage, 3 retrieval misses + 2
+  gate rejections; the Tesla/gender question moved from a retrieval miss
+  to a gate rejection — the fix improved its lexical match enough to get
+  retrieved, gate still says no). The 2 gate-rejected cases show clean
+  separation from correct cases on `top1_dense`/`top3_mean_dense` (no
+  range overlap at all) — but n=2 is too small to trust as a real,
+  generalizable pattern, not the same confidence as the n=28/n=150
+  samples used for similar findings earlier. Same conclusion as before,
+  now on current data: too few failures at this coverage level for
+  correlational analysis to say more.
 - [ ] **Find what drives the sufficiency gate's remaining rejections.**
   Ruled out the lexical-score and lower-floor hypotheses, threshold
   tuning, and now calibration-set size too (see Done — confirmed real,
@@ -131,3 +127,8 @@ Backlog for ongoing work, checked off as items land.
   path (guard 82.7%→96%), explained by the classifier's known heavier
   reliance on lexical score there. Real LLM: unchanged, small-sample
   noise only
+- 2026-08-22 — Re-ran the retrieval-miss diagnostic against the current
+  tokenizer-fixed code (was stale, predated the fix). Failure set
+  genuinely changed (now 5, not 3) — same "sample size too small to
+  find a real pattern" conclusion as before, just confirmed on current
+  data instead of stale data
