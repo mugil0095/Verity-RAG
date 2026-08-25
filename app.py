@@ -37,6 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
 from verityrag import VerityRAGPipeline  # noqa: E402
 from verityrag.streaming import LiveDocumentStream  # noqa: E402
+from verityrag.usage_tracker import log_input  # noqa: E402
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
@@ -91,6 +92,7 @@ def _load_json(name):
 with st.sidebar:
     st.title("🔎 VerityRAG")
     st.caption("Real-time agentic RAG with grounding & hallucination detection")
+    st.caption("Questions asked and documents added here may be logged for demo/analytics purposes.")
 
     st.divider()
     st.subheader("Index status")
@@ -144,6 +146,7 @@ with st.sidebar:
         text = st.text_area("Text", height=100)
         if st.form_submit_button("Ingest", use_container_width=True) and title and text:
             n = pipeline.ingest_document(f"user-{int(time.time() * 1000)}", title, text)
+            log_input("document", {"title": title, "text": text, "chunks_added": n})
             st.toast(f"Added {n} chunk(s) — searchable immediately.", icon="✅")
             st.rerun()
 
@@ -173,6 +176,13 @@ with tab_ask:
     if ask_clicked and question.strip():
         with st.spinner("Retrieving → reranking → checking groundedness..."):
             result = pipeline.query(question)
+
+        log_input("question", {
+            "question": question,
+            "abstained": result.abstained,
+            "answer": result.answer,
+            "grounding_score": result.grounding.overall_score if result.grounding else None,
+        })
 
         if result.abstained:
             st.warning(
