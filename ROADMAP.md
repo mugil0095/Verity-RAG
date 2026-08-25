@@ -7,6 +7,17 @@ Nothing currently open — see Log for what's next up for grabs, or start a
 new thread.
 
 ## Done
+- [x] **Built `usage_tracker.py`: logs real demo inputs (questions asked,
+  documents added) to a separate, private tracking repo.** One JSON file
+  per submission (timestamp + random suffix — avoids any race condition
+  between concurrent visitors updating one shared log file), committed
+  via the GitHub Contents API. Fails silently, never raises into the
+  caller — an optional logging feature must never block or error out a
+  visitor's actual request just because the tracking call failed for any
+  reason (missing token, network issue, GitHub rate limit). Reads the
+  token from Streamlit secrets, never hardcoded or shared in chat. Added
+  an honest, visible disclosure in the app that inputs may be logged.
+  6 new mocked tests (no real token needed to test this).
 - [x] **Made app.py's pipeline a shared singleton instead of per-session
   state, for real hosted-deployment capacity.** Each browser session
   previously got its own independent `VerityRAGPipeline()` — a nicer
@@ -235,3 +246,7 @@ new thread.
   memory-constrained host). Found and fixed a real test-isolation bug
   this caused (two separate AppTest instances shared the same cached
   object) — tests were passing due to file ordering, not real isolation
+- 2026-08-25 — Built usage_tracker.py: logs real demo inputs to a
+  separate, private tracking repo via the GitHub Contents API. Fails
+  silently on any error (missing token, network, rate limit) — never
+  blocks or breaks a visitor's actual request
