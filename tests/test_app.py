@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 pytest.importorskip("streamlit")
+import streamlit as st  # noqa: E402
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
@@ -19,6 +20,25 @@ pytestmark = pytest.mark.skipif(
     not (DATA_DIR / "corpus.json").exists(),
     reason="data/corpus.json not built -- run `python data/build_corpus.py` first",
 )
+
+
+@pytest.fixture(autouse=True)
+def _clear_shared_pipeline_cache():
+    """app.py's main pipeline is a deliberate, shared @st.cache_resource
+    singleton -- one instance for every real browser session against one
+    running server, which is exactly the point (see app.py's own module
+    docstring). But that means it's also scoped to the PYTHON PROCESS, not
+    to individual AppTest instances -- confirmed directly: two separate,
+    independently-constructed AppTest.from_file() calls in the same pytest
+    process return the literal same pipeline object (same id()), so one
+    test's ingested documents leak into the next test's "fresh" instance.
+    Without this, tests only happened to pass because of file ordering
+    (the one test asserting an empty index runs first, before anything
+    could pollute it) -- not because isolation genuinely held. Clearing
+    the cache before each test restores real per-test isolation without
+    touching the sharing behavior the real app actually wants."""
+    st.cache_resource.clear()
+    yield
 
 
 def test_app_loads_without_exceptions():
@@ -35,7 +55,7 @@ def test_sidebar_load_corpus_populates_index():
     load_btn.click().run(timeout=60)
     assert not at.exception
     assert at.session_state.pipeline.index.size() > 0
-    assert at.session_state.reranker_trained is True
+    assert at.session_state.pipeline._reranker_model is not None
 
 
 def test_sidebar_calibration_updates_gate():
@@ -45,7 +65,6 @@ def test_sidebar_calibration_updates_gate():
     calib_btn = [b for b in at.sidebar.button if "Calibrate" in b.label][0]
     calib_btn.click().run(timeout=60)
     assert not at.exception
-    assert at.session_state.gate_calibrated is True
     assert at.session_state.pipeline.agent.sufficiency_gate.is_calibrated is True
 
 

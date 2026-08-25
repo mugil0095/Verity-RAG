@@ -7,6 +7,26 @@ Nothing currently open — see Log for what's next up for grabs, or start a
 new thread.
 
 ## Done
+- [x] **Made app.py's pipeline a shared singleton instead of per-session
+  state, for real hosted-deployment capacity.** Each browser session
+  previously got its own independent `VerityRAGPipeline()` — a nicer
+  experience (one visitor's actions never affect another's), but each
+  fully-loaded session duplicates the ~422MB vector matrix (845 chunks x
+  65536-dim `HashingEmbedder` vectors, confirmed directly). On a
+  memory-constrained free host (~1GB), that's the difference between
+  supporting roughly 1 concurrent session and several dozen. Switched to
+  `@st.cache_resource` (one instance for every visitor, matching how
+  `api.py` already works) — the UI now says explicitly that loading,
+  resetting, and adding documents affect the shared state for everyone,
+  rather than changing this silently. The separate streaming-demo
+  pipeline stays per-session on purpose (it needs each visitor to see a
+  fresh "before streaming" state for the demo to mean anything).
+  Found and fixed a real test-isolation bug this introduced: two separate
+  `AppTest` instances in the same pytest process got the literal same
+  cached pipeline object (confirmed directly via `id()`), so tests were
+  only passing because of file ordering, not genuine isolation — fixed
+  with an explicit `st.cache_resource.clear()` between tests, scoped to
+  just this test file.
 - [x] **Actually load-tested concurrency instead of just reasoning about
   the locking code.** `LiveIndex` uses `threading.RLock()` around both
   reads and writes — designed for concurrent ingestion/querying, but
@@ -210,3 +230,8 @@ new thread.
   reasoning about the locking code: real FastAPI server, genuine
   concurrent HTTP traffic, 100 mixed ingest/query calls at once, zero
   errors, no lost index updates
+- 2026-08-25 — Switched app.py to a shared pipeline singleton for hosted
+  deployment capacity (~1 concurrent session -> several dozen on a
+  memory-constrained host). Found and fixed a real test-isolation bug
+  this caused (two separate AppTest instances shared the same cached
+  object) — tests were passing due to file ordering, not real isolation
