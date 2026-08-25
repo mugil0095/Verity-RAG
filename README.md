@@ -2,7 +2,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/mugil0095/Verity-RAG/blob/master/LICENSE)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
 
-# VerityRAG  [Live Link](https://verityrag.streamlit.app/)
+# VerityRAG  ## [Live Link](https://verityrag.streamlit.app/)
 
 **Real-time agentic RAG with grounding & hallucination detection.**
 
