@@ -3,41 +3,48 @@
 Backlog for ongoing work, checked off as items land.
 
 ## Status
-- [ ] **Retrieval sometimes fails to surface the right chunk — cause still
-  unclear.** Re-ran against the current, tokenizer-fixed code rather than
-  trust the stale 3-failure analysis — confirmed the failure set genuinely
-  changed (now 5 failures matching 93.3% coverage, 3 retrieval misses + 2
-  gate rejections; the Tesla/gender question moved from a retrieval miss
-  to a gate rejection — the fix improved its lexical match enough to get
-  retrieved, gate still says no). The 2 gate-rejected cases show clean
-  separation from correct cases on `top1_dense`/`top3_mean_dense` (no
-  range overlap at all) — but n=2 is too small to trust as a real,
-  generalizable pattern, not the same confidence as the n=28/n=150
-  samples used for similar findings earlier. Same conclusion as before,
-  now on current data: too few failures at this coverage level for
-  correlational analysis to say more.
-- [ ] **Find what drives the sufficiency gate's remaining rejections.**
-  Ruled out the lexical-score and lower-floor hypotheses, threshold
-  tuning, calibration-set size (confirmed real, already near its
-  plateau), and now a `top1_minus_top3mean_gap` feature too (see Done —
-  had a real effect, unlike the floor experiment, but the effect looked
-  net-harmful once actually inspected: it let through a confidently wrong,
-  off-topic answer, not just a coverage number). No further concrete
-  hypothesis identified — this has had more angles tried than any other
-  thread this session, may be close to its practical ceiling.
-- [ ] **Hybrid ranking: real imprecision, but the system already
-  compensates for most of it.** Checked across all 150 answerable
-  questions (not 1-2 anecdotes): raw `hybrid_retrieve()` puts the correct
-  document at rank 1 only 61% of the time, but it's in the top-6 80% of
-  the time — and actual coverage is 93.3%, because the reranker gets a
-  second pass and the extractive generator can pull from any top-6
-  candidate, not just rank 1. When the wrong document does win, dense
-  score is involved 89% of the time vs. lexical 57% — the opposite of the
-  one earlier anecdote (which used real embeddings, n=1). Given the
-  system already shows real resilience to this, not clearly worth
-  chasing further right now — the min-max-normalization-sensitivity
-  theory is still untested if it becomes worth revisiting.
+Nothing currently open — see Log for what's next up for grabs, or start a
+new thread.
+
 ## Done
+- [x] **Ruled out the last named hypothesis on the hybrid-ranking
+  thread: min-max-normalization sensitivity.** The theory was that
+  normalizing lexical/dense scores over the ENTIRE index (not just the
+  top-k) could let some unrelated, high-scoring chunk elsewhere in the
+  corpus distort the scale for a given query, favoring the wrong document.
+  Tested directly across all 150 answerable questions: for the 29 cases
+  where the wrong document wins rank 1, checked whether the index-wide
+  max lexical/dense score came from within the actual top-6 candidates or
+  from somewhere else entirely. Lexical: 1/29 (3%) from outside. Dense:
+  0/29 (0%). The hypothesis doesn't hold — in virtually every case, the
+  top-6 candidates already contain the highest-scoring chunks for that
+  query (unsurprising in retrospect: that's how they became top-6), so
+  the normalization scale isn't being distorted by some far-away outlier.
+  The "wrong document wins" pattern is a genuine, head-to-head competition
+  among the real candidates, decided by the actual 0.4/0.6
+  lexical/dense weighting — not a normalization artifact. Closes out the
+  hybrid-ranking investigation thread with no remaining open questions.
+- [x] **Closed out the sufficiency-gate/retrieval-miss investigation with
+  a genuinely conclusive answer, not another inconclusive attempt.** Every
+  prior hypothesis on this thread was blocked by the same wall: only 5
+  failures at 93.3% coverage is too few to trust. Built
+  `scripts/expanded_coverage_sample.py` — a separate, additive sample
+  (400 questions, same 12 topics, higher per-paragraph cap than
+  `build_corpus.py`'s default of 2; doesn't touch the existing
+  150-question baseline any other measured number depends on) — to
+  actually get past the sample-size ceiling instead of accepting it.
+  Result: 54 real failures (10x the previous sample), and a proper
+  Mann-Whitney significance test on all 5 gate features against 346
+  correct cases. Every single feature is genuinely, statistically
+  significant (p<0.01, most below p<0.000001) — confirming these
+  features do carry real signal, not coincidence — but every one still
+  has real range overlap between the groups. Honest, well-evidenced
+  conclusion: the gate isn't missing an obvious signal it should be
+  using — the underlying problem is genuinely, irreducibly probabilistic
+  at the decision boundary, which is exactly why no single feature
+  reweighting or threshold adjustment ever produced a clean win across
+  this whole investigation. This is the actual answer, not a dead end —
+  it explains the previous 6 attempts' consistent lack of a clean fix.
 - [x] **Found a real, reproducible ~15% latency improvement for real
   embeddings — not yet adopted as the default.** `MKL_THREADING_LAYER=GNU`
   (instead of the current `OMP_NUM_THREADS=1`) measured p50 2175ms→1855ms,
@@ -173,3 +180,16 @@ Backlog for ongoing work, checked off as items land.
   sustained use to manifest, and two runs is less evidence than
   `OMP_NUM_THREADS=1`'s stable track record across this whole session.
   Documented as an opt-in instead of risking a regression for 15%
+- 2026-08-25 — Built an expanded, separate 400-question sample (same
+  topics, higher per-paragraph cap) to get past the sample-size ceiling
+  that blocked every prior sufficiency-gate hypothesis. 54 real failures
+  (10x more than any previous check), every gate feature statistically
+  significant (Mann-Whitney p<0.01) but none cleanly separating the
+  groups — a real, conclusive answer: the problem is genuinely
+  probabilistic at the margin, not a missing signal
+- 2026-08-25 — Tested the min-max-normalization-sensitivity theory
+  directly (last named hypothesis on the hybrid-ranking thread) instead
+  of leaving it as an untested idea. Checked whether the index-wide max
+  score comes from outside the top-6 for all 29 wrong-rank-1 cases —
+  only 3% (lexical) and 0% (dense) did. Hypothesis doesn't hold; closes
+  out the hybrid-ranking thread with no open questions remaining

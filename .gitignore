@@ -21,6 +21,8 @@ threshold_sweep.json
 llm_coverage_diagnosis.json
 calibration_learning_curve.json
 hybrid_ranking_diagnosis.json
+expanded_coverage_sample.json
+normalization_sensitivity_check.json
 
 # OS
 .DS_Store
