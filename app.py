@@ -6,9 +6,26 @@ powers api.py) -- no separate server to run, just:
 
     streamlit run app.py
 
-This is a demo/inspection UI, not a load-tested production frontend: the
-pipeline lives in Streamlit's session state, so each browser session gets
-its own in-memory index (reset by reloading the page or clicking "Reset").
+The main pipeline is a SHARED, module-level singleton (like api.py's own
+pipeline), not per-session state -- deliberately changed from an earlier
+per-session design. Each browser session used to get its own independent
+in-memory index, which is a genuinely nicer experience (one visitor's
+"add a document" or "reset" never affects anyone else), but it means the
+~422MB vector matrix (845 chunks x 65536-dim HashingEmbedder vectors)
+gets duplicated in memory for every concurrent visitor. On a memory-
+constrained free host (~1GB), that's the difference between supporting
+roughly 1 concurrent fully-loaded session and several dozen. For a
+public demo meant to be shown, not a private sandbox per visitor, that
+trade-off is worth it -- loading the corpus, resetting, and adding a
+document now affect the shared state for everyone currently using the
+app, and the UI says so explicitly rather than changing this silently.
+
+The SEPARATE demo_pipeline (the "Real-time streaming demo" tab) stays
+per-session on purpose: it specifically needs each visitor to see a
+fresh "abstained before streaming" state for the before/after contrast
+to mean anything. Sharing it would mean only the very first visitor to
+ever click "Run the live streaming demo" sees a real demonstration --
+everyone after that would find Tesla already ingested.
 """
 import sys
 import time
@@ -27,22 +44,34 @@ st.set_page_config(page_title="VerityRAG", page_icon="🔎", layout="wide")
 
 
 # ----------------------------------------------------------------------
-# Session state
+# Shared, module-level pipeline -- one instance for every visitor, not
+# one per browser session (see module docstring for why).
+# ----------------------------------------------------------------------
+@st.cache_resource
+def _get_shared_pipeline():
+    return VerityRAGPipeline()
+
+
+pipeline = _get_shared_pipeline()
+st.session_state.pipeline = pipeline  # same shared object, exposed for introspection/testing
+
+
+# ----------------------------------------------------------------------
+# Session state -- only for things that genuinely should stay per-visitor
+# (the separate streaming-demo pipeline), plus UI flags that mirror the
+# shared pipeline's own state (trained/calibrated are properties of
+# `pipeline` itself, tracked here only so Streamlit's rerun model has
+# something to read without re-deriving it every time).
 # ----------------------------------------------------------------------
 def _init_state():
-    if "pipeline" not in st.session_state:
-        st.session_state.pipeline = VerityRAGPipeline()
-        st.session_state.reranker_trained = False
-        st.session_state.gate_calibrated = False
     if "demo_pipeline" not in st.session_state:
-        st.session_state.demo_pipeline = None  # separate, self-contained -- see tab_demo
+        st.session_state.demo_pipeline = None  # separate, self-contained, per-session on purpose -- see tab_demo
         st.session_state.demo_before = None
         st.session_state.demo_after = None
         st.session_state.demo_unanswerable = None
 
 
 _init_state()
-pipeline = st.session_state.pipeline
 
 
 def _data_files_present() -> bool:
@@ -65,17 +94,21 @@ with st.sidebar:
 
     st.divider()
     st.subheader("Index status")
+    st.caption("Shared across all visitors — not private per browser session.")
     c1, c2 = st.columns(2)
     c1.metric("Chunks indexed", pipeline.index.size())
     c2.metric("Live updates", pipeline.index.updates_count)
+    reranker_trained = pipeline._reranker_model is not None
+    gate_calibrated = pipeline.agent.sufficiency_gate.is_calibrated
     st.write(
-        f"Reranker: {'✅ trained' if st.session_state.reranker_trained else '⬜ not trained'}  \n"
-        f"Sufficiency gate: {'✅ calibrated' if st.session_state.gate_calibrated else '⬜ default (uncalibrated)'}"
+        f"Reranker: {'✅ trained' if reranker_trained else '⬜ not trained'}  \n"
+        f"Sufficiency gate: {'✅ calibrated' if gate_calibrated else '⬜ default (uncalibrated)'}"
     )
 
     st.divider()
     st.subheader("Load the real demo corpus")
-    st.caption("620 real Wikipedia paragraphs (SQuAD dev set) + trains the reranker.")
+    st.caption("620 real Wikipedia paragraphs (SQuAD dev set) + trains the reranker. "
+               "Loads it for everyone currently using the app, not just you.")
     if not _data_files_present():
         st.warning("data/corpus.json not found.")
         st.code("python data/build_corpus.py", language="bash")
@@ -85,11 +118,10 @@ with st.sidebar:
                 corpus = _load_json("corpus.json")
                 pipeline.ingest_documents(corpus)
                 pipeline.train_reranker(n_queries=200)
-                st.session_state.reranker_trained = True
             st.toast(f"Indexed {pipeline.index.size()} chunks.", icon="✅")
             st.rerun()
 
-        if pipeline.index.size() > 0 and not st.session_state.gate_calibrated:
+        if pipeline.index.size() > 0 and not gate_calibrated:
             if st.button("Calibrate sufficiency gate (~30s, recommended)", use_container_width=True):
                 with st.spinner("Calibrating on real labeled questions..."):
                     answerable = _load_json("eval_answerable.json")[:60]
@@ -98,7 +130,6 @@ with st.sidebar:
                         [q["question"] for q in answerable],
                         [q["question"] for q in unanswerable],
                     )
-                    st.session_state.gate_calibrated = ok
                 if ok:
                     st.toast("Calibrated — the hallucination guard is now meaningfully stronger.", icon="✅")
                 else:
@@ -107,6 +138,7 @@ with st.sidebar:
 
     st.divider()
     st.subheader("Add your own document")
+    st.caption("Added to the shared index everyone sees, not just this browser.")
     with st.form("add_doc", clear_on_submit=True):
         title = st.text_input("Title")
         text = st.text_area("Text", height=100)
@@ -116,7 +148,8 @@ with st.sidebar:
             st.rerun()
 
     st.divider()
-    if st.button("↺ Reset (clear index)", use_container_width=True):
+    if st.button("↺ Reset shared demo (clears index for everyone)", use_container_width=True):
+        _get_shared_pipeline.clear()  # invalidates the cached singleton -- next access builds a fresh one
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
