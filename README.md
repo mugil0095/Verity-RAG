@@ -144,6 +144,21 @@ crash is worse than "a bit slow," so this is offered as an opt-in, not a
 replacement, until it's been proven under more sustained use (e.g. the
 Streamlit streaming demo running for an extended period).
 
+**Concurrency was designed in but never actually load-tested until it
+was.** `LiveIndex` (indexing.py) uses `threading.RLock()` around both
+reads and writes specifically so ingestion and queries can happen at the
+same time — the real-time thesis requires it. That was reasoned about
+from the code, not verified, until `scripts/concurrent_load_test.py`
+actually started the real FastAPI server and fired genuine concurrent
+HTTP traffic at it: 30 simultaneous `/ingest` calls (final index size
+exactly matched what was sent, no lost updates), 30 simultaneous
+`/query` calls, and 100 concurrent mixed ingest+query calls, all with
+zero errors. The key detail that makes this correct: `VectorIndex.add()`
+uses `np.vstack` to build a brand-new array rather than mutating one in
+place, so a reader holding a reference from an earlier snapshot stays
+valid even if a write happens concurrently and reassigns the underlying
+array to something else.
+
 ## Real embeddings, measured
 
 `SentenceTransformerEmbedder` (`all-MiniLM-L6-v2`) is opt-in via
