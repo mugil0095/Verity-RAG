@@ -7,6 +7,19 @@ Nothing currently open — see Log for what's next up for grabs, or start a
 new thread.
 
 ## Done
+- [x] **Actually load-tested concurrency instead of just reasoning about
+  the locking code.** `LiveIndex` uses `threading.RLock()` around both
+  reads and writes — designed for concurrent ingestion/querying, but
+  never verified under real load. Built
+  `scripts/concurrent_load_test.py`: starts the real FastAPI server
+  (uvicorn subprocess) and fires genuine concurrent HTTP traffic at it,
+  not just calling Python objects directly. 30 simultaneous `/ingest`
+  calls (final index size exactly matched what was sent — no lost
+  updates), 30 simultaneous `/query` calls, 100 concurrent mixed
+  ingest+query calls — zero errors across all of it, at two different
+  scales. The design holds up: `VectorIndex.add()` uses `np.vstack` to
+  build a new array rather than mutate one in place, so a reader's
+  snapshot stays valid even through a concurrent write.
 - [x] **Ruled out the last named hypothesis on the hybrid-ranking
   thread: min-max-normalization sensitivity.** The theory was that
   normalizing lexical/dense scores over the ENTIRE index (not just the
@@ -193,3 +206,7 @@ new thread.
   score comes from outside the top-6 for all 29 wrong-rank-1 cases —
   only 3% (lexical) and 0% (dense) did. Hypothesis doesn't hold; closes
   out the hybrid-ranking thread with no open questions remaining
+- 2026-08-25 — Load-tested concurrency for real instead of just
+  reasoning about the locking code: real FastAPI server, genuine
+  concurrent HTTP traffic, 100 mixed ingest/query calls at once, zero
+  errors, no lost index updates
