@@ -18,11 +18,13 @@ Backlog for ongoing work, checked off as items land.
   correlational analysis to say more.
 - [ ] **Find what drives the sufficiency gate's remaining rejections.**
   Ruled out the lexical-score and lower-floor hypotheses, threshold
-  tuning, and now calibration-set size too (see Done — confirmed real,
-  but already near its plateau at current data levels). `top3_mean_dense`
-  still looks like the real signal — a single strong match with weak
-  supporting candidates gets under-trusted. Untried: reweighting that
-  feature directly.
+  tuning, calibration-set size (confirmed real, already near its
+  plateau), and now a `top1_minus_top3mean_gap` feature too (see Done —
+  had a real effect, unlike the floor experiment, but the effect looked
+  net-harmful once actually inspected: it let through a confidently wrong,
+  off-topic answer, not just a coverage number). No further concrete
+  hypothesis identified — this has had more angles tried than any other
+  thread this session, may be close to its practical ceiling.
 - [ ] **Hybrid ranking: real imprecision, but the system already
   compensates for most of it.** Checked across all 150 answerable
   questions (not 1-2 anecdotes): raw `hybrid_retrieve()` puts the correct
@@ -35,12 +37,39 @@ Backlog for ongoing work, checked off as items land.
   system already shows real resilience to this, not clearly worth
   chasing further right now — the min-max-normalization-sensitivity
   theory is still untested if it becomes worth revisiting.
-- [ ] **Recover real-embeddings latency.** `OMP_NUM_THREADS=1` fixed a
-  real Windows crash but forces single-threaded execution everywhere.
-  Worth trying a clean torch/numpy reinstall to see if the underlying
-  OpenMP conflict goes away instead of staying worked around.
-
 ## Done
+- [x] **Found a real, reproducible ~15% latency improvement for real
+  embeddings — not yet adopted as the default.** `MKL_THREADING_LAYER=GNU`
+  (instead of the current `OMP_NUM_THREADS=1`) measured p50 2175ms→1855ms,
+  p95 4087ms→3443ms, confirmed across two separate full-eval runs with
+  identical coverage/guard (0.92/0.96) both times — a real speedup, not
+  noise, with zero accuracy cost. Kept `OMP_NUM_THREADS=1` as the actual
+  default anyway: the crash it was fixing specifically needed *sustained*
+  use to manifest (~100 questions into a run), and two successful
+  ~150-question runs, while a reasonably good sign, is meaningfully less
+  runtime than `OMP_NUM_THREADS=1` has accumulated stably across this
+  entire session. A crash is a worse outcome than "a bit slow," so this
+  needs more sustained testing (e.g. the Streamlit streaming demo running
+  for an extended period) before it's worth the risk of switching the
+  default. Documented as an available, faster opt-in instead — see README.
+- [x] **Tested `top1_minus_top3mean_gap` for the sufficiency gate —
+  reverted, real effect but net-harmful.** Added as an additional feature
+  (top1_dense minus top3_mean_dense), meant to capture "isolated strong
+  match" cases without removing any existing signal — lower risk than the
+  earlier floor experiment. Had a genuine, measured effect on the trained
+  classifier (unlike that floor experiment, which had none): coverage
+  93.3%→94.7%, guard 77.3%→76.0%. But checking which SPECIFIC questions
+  moved — not just the aggregate counts — showed several individual
+  predictions shifting in both directions, not a clean net +1/-1. One
+  newly-"answered" case was a real, confirmed problem: a confidently wrong,
+  completely off-topic answer (about Luther's biographer, for a question
+  about where Luther focused his reform efforts) counted as a coverage
+  success purely because the extractive generator pulled verbatim text
+  from *some* document. `coverage_rate` doesn't check answer correctness,
+  so this failure mode was invisible to the headline metric even though
+  it's exactly what this project exists to prevent. Reverted for a
+  different reason than the floor experiment: not because it did nothing,
+  but because its real effect looked harmful once actually inspected.
 - [x] **Re-verified real-embeddings and real-LLM numbers against the
   fixed tokenizer.** Real embeddings: much bigger effect than the
   default path (guard 82.7%→96%, coverage 89.3%→92%, keyword-hit
@@ -132,3 +161,15 @@ Backlog for ongoing work, checked off as items land.
   genuinely changed (now 5, not 3) — same "sample size too small to
   find a real pattern" conclusion as before, just confirmed on current
   data instead of stale data
+- 2026-08-22 — Tried a `top1_minus_top3mean_gap` feature for the
+  sufficiency gate; real effect this time (unlike the floor experiment),
+  but inspecting which specific questions moved found it let through a
+  confidently wrong, off-topic answer — reverted for being net-harmful,
+  not for having no effect
+- 2026-08-22 — Found a real ~15% real-embeddings latency improvement
+  (`MKL_THREADING_LAYER=GNU` vs. the current `OMP_NUM_THREADS=1`),
+  confirmed across two full-eval runs with identical accuracy. Not
+  adopted as the default yet — the crash it works around needed
+  sustained use to manifest, and two runs is less evidence than
+  `OMP_NUM_THREADS=1`'s stable track record across this whole session.
+  Documented as an opt-in instead of risking a regression for 15%

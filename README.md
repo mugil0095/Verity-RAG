@@ -133,6 +133,17 @@ sustained use; fixed with `OMP_NUM_THREADS=1`. Both are real fixes for a
 real class of issue, but forcing single-threaded execution is also why
 real embeddings pay a latency tax beyond what CPU inference alone costs.
 
+Found a real, measured ~15% latency improvement since (p50 2175ms→1855ms,
+p95 4087ms→3443ms, identical accuracy) by setting `MKL_THREADING_LAYER=GNU`
+instead of `OMP_NUM_THREADS=1` — worth trying if the extra speed matters
+to you. Not made the default: the original crash specifically needed
+sustained use to show up, and this alternative has only been confirmed
+across two full-eval runs so far, meaningfully less runtime than
+`OMP_NUM_THREADS=1`'s stable track record across this whole project. A
+crash is worse than "a bit slow," so this is offered as an opt-in, not a
+replacement, until it's been proven under more sustained use (e.g. the
+Streamlit streaming demo running for an extended period).
+
 ## Real embeddings, measured
 
 `SentenceTransformerEmbedder` (`all-MiniLM-L6-v2`) is opt-in via
