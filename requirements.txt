@@ -9,9 +9,9 @@ pytest
 pytest-asyncio
 pydantic
 httpx
-streamlit
+streamlit>=1.62,<1.64
 sentence-transformers
 anthropic
-google-genai
+google-genai>=2.21,<2.23
 elasticsearch
 requests

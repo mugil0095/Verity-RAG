@@ -27,6 +27,7 @@ to mean anything. Sharing it would mean only the very first visitor to
 ever click "Run the live streaming demo" sees a real demonstration --
 everyone after that would find Tesla already ingested.
 """
+import os
 import sys
 import time
 from pathlib import Path
@@ -43,6 +44,25 @@ DATA_DIR = Path(__file__).resolve().parent / "data"
 
 st.set_page_config(page_title="VerityRAG", page_icon="🔎", layout="wide")
 
+# gemini_complete_fn (llm_providers.py) reads GEMINI_API_KEY from
+# os.environ -- it predates this app and is also used from the CLI,
+# where that's the natural place to look. Streamlit's own secrets
+# mechanism (st.secrets) is separate from os.environ by default, so this
+# bridges the two rather than modifying the already-tested library
+# function to know about Streamlit specifically. st.secrets.get() itself
+# raises StreamlitSecretNotFoundError (not just returning None) when no
+# secrets.toml exists at all -- confirmed directly, not assumed -- so
+# this needs the same try/except usage_tracker.py's _get_secret() already
+# uses for exactly this reason. Silently does nothing if no secret is
+# configured -- same "optional feature, not core to the app working"
+# principle as usage_tracker.py's GITHUB_TOKEN handling.
+try:
+    _gemini_secret = st.secrets.get("GEMINI_API_KEY")
+except Exception:
+    _gemini_secret = None
+if _gemini_secret and not os.environ.get("GEMINI_API_KEY"):
+    os.environ["GEMINI_API_KEY"] = _gemini_secret
+
 
 # ----------------------------------------------------------------------
 # Shared, module-level pipeline -- one instance for every visitor, not
@@ -55,6 +75,34 @@ def _get_shared_pipeline():
 
 pipeline = _get_shared_pipeline()
 st.session_state.pipeline = pipeline  # same shared object, exposed for introspection/testing
+
+
+def _llm_comparison_available() -> bool:
+    return bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
+
+
+def _build_llm_comparison_agent():
+    """Shares the main pipeline's expensive, already-loaded resources
+    (index, embedder, reranker, sufficiency gate) -- only the generator
+    differs. Deliberately NOT cached: the reranker and sufficiency gate
+    on the shared pipeline.agent can change after this app starts (a
+    visitor training the reranker or calibrating later), and caching a
+    comparison agent built before that would hold a stale reference to
+    whatever those were at cache time. Constructing an AgentController
+    itself is cheap -- it only stores references, no heavy computation --
+    so building it fresh on every call is the simpler, correct choice."""
+    from verityrag.agent import AgentController
+    from verityrag.generation import LLMGenerator
+    from verityrag.llm_providers import gemini_complete_fn
+
+    return AgentController(
+        index=pipeline.index,
+        embedder=pipeline.embedder,
+        generator=LLMGenerator(complete_fn=gemini_complete_fn),
+        reranker_model=pipeline.agent.reranker_model,
+        sufficiency_gate=pipeline.agent.sufficiency_gate,
+        max_hops=pipeline.agent.max_hops,
+    )
 
 
 # ----------------------------------------------------------------------
@@ -165,6 +213,49 @@ with st.sidebar:
 # ----------------------------------------------------------------------
 tab_ask, tab_demo = st.tabs(["Ask a question", "Real-time streaming demo"])
 
+
+def _render_result(result, container=st):
+    """Renders one AgentResult's abstain/answer/grounding/claims/trace/
+    evidence -- factored out so the single-result and side-by-side LLM
+    comparison cases share the exact same display logic instead of
+    diverging into two separately-maintained code paths."""
+    if result.abstained:
+        container.warning(
+            "**Abstained** — the sufficiency gate didn't find confident, "
+            "relevant evidence, so no answer was generated rather than "
+            "risk a plausible-sounding guess."
+        )
+    else:
+        container.success(result.answer)
+        score = result.grounding.overall_score
+        container.progress(
+            score,
+            text=f"Grounding score: {score:.0%} — verdict: {result.grounding.verdict}",
+        )
+
+        with container.expander("Claim-level grounding breakdown"):
+            for claim in result.grounding.claims:
+                icon = "✅" if claim.is_grounded else "❌"
+                st.markdown(f"{icon} {claim.claim}")
+                st.caption(
+                    f"semantic support: {claim.semantic_support:.2f} · "
+                    f"lexical support: {claim.lexical_support:.2f}"
+                )
+
+    with container.expander("Agent trace (hops, reformulation, decisions)"):
+        for step in result.trace:
+            st.write(
+                f"**hop {step.hop} · {step.action}** — "
+                f"score={step.top_score:.3f} — query used: _{step.query_used!r}_"
+            )
+
+    if result.evidence:
+        with container.expander(f"Evidence used ({len(result.evidence)} chunks)"):
+            for e in result.evidence:
+                st.markdown(f"**{e.title}** — dense={e.dense_score:.3f}, lexical={e.lexical_score:.3f}")
+                st.caption(e.text)
+
+
 with tab_ask:
     st.header("Ask a question")
     if pipeline.index.size() == 0:
@@ -173,54 +264,61 @@ with tab_ask:
     question = st.text_input(
         "Question", placeholder="e.g. What is Nikola Tesla known for?", key="ask_question", max_chars=500
     )
+
+    compare_with_llm = st.checkbox(
+        "Also show a real LLM's answer (Gemini) side-by-side — same retrieved evidence, "
+        "different generator, showcases this project's actual grounding/hallucination thesis",
+        disabled=not _llm_comparison_available(),
+        help=None if _llm_comparison_available() else
+             "Needs a GEMINI_API_KEY configured in this app's secrets to enable.",
+    )
     ask_clicked = st.button("Ask", type="primary")
 
     if ask_clicked and question.strip():
         with st.spinner("Retrieving → reranking → checking groundedness..."):
             result = pipeline.query(question)
 
-        log_input("question", {
+        log_payload = {
             "question": question,
             "abstained": result.abstained,
             "answer": result.answer,
             "grounding_score": result.grounding.overall_score if result.grounding else None,
-        })
+        }
 
-        if result.abstained:
-            st.warning(
-                "**Abstained** — the sufficiency gate didn't find confident, "
-                "relevant evidence, so no answer was generated rather than "
-                "risk a plausible-sounding guess."
-            )
+        if compare_with_llm:
+            col_extractive, col_llm = st.columns(2)
+            with col_extractive:
+                st.subheader("Extractive (default)")
+                _render_result(result, container=col_extractive)
+
+            with col_llm:
+                st.subheader("Real LLM (Gemini)")
+                try:
+                    with st.spinner("Calling Gemini..."):
+                        llm_agent = _build_llm_comparison_agent()
+                        llm_result = llm_agent.answer(question)
+                    _render_result(llm_result, container=col_llm)
+                    log_payload["llm_comparison"] = {
+                        "abstained": llm_result.abstained,
+                        "answer": llm_result.answer,
+                        "grounding_score": llm_result.grounding.overall_score if llm_result.grounding else None,
+                    }
+                except Exception as e:
+                    # Real, expected failure modes here: a free-tier daily
+                    # quota exhausted (llm_providers.py raises a clear
+                    # RuntimeError for this specifically), a transient
+                    # network issue, or any other real API failure. This
+                    # comparison is an optional extra, not core to the
+                    # app -- a visitor should still get their real,
+                    # working extractive answer on the left even if the
+                    # LLM side fails for any reason, not a crashed page.
+                    col_llm.error(f"LLM comparison unavailable right now: {e}")
+                    log_payload["llm_comparison_error"] = str(e)
+
         else:
-            st.success(result.answer)
-            score = result.grounding.overall_score
-            st.progress(
-                score,
-                text=f"Grounding score: {score:.0%} — verdict: {result.grounding.verdict}",
-            )
+            _render_result(result)
 
-            with st.expander("Claim-level grounding breakdown"):
-                for claim in result.grounding.claims:
-                    icon = "✅" if claim.is_grounded else "❌"
-                    st.markdown(f"{icon} {claim.claim}")
-                    st.caption(
-                        f"semantic support: {claim.semantic_support:.2f} · "
-                        f"lexical support: {claim.lexical_support:.2f}"
-                    )
-
-        with st.expander("Agent trace (hops, reformulation, decisions)"):
-            for step in result.trace:
-                st.write(
-                    f"**hop {step.hop} · {step.action}** — "
-                    f"score={step.top_score:.3f} — query used: _{step.query_used!r}_"
-                )
-
-        if result.evidence:
-            with st.expander(f"Evidence used ({len(result.evidence)} chunks)"):
-                for e in result.evidence:
-                    st.markdown(f"**{e.title}** — dense={e.dense_score:.3f}, lexical={e.lexical_score:.3f}")
-                    st.caption(e.text)
+        log_input("question", log_payload)
 
 with tab_demo:
     st.header("Real-time streaming demo")

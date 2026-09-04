@@ -156,7 +156,10 @@ def test_llm_comparison_checkbox_disabled_without_api_key(monkeypatch):
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     at = AppTest.from_file(str(APP_PATH))
     at.run(timeout=30)
-    checkbox = [c for c in at.checkbox if "LLM" in c.label][0]
+    assert not at.exception, f"App crashed on startup: {at.exception}"
+    matches = [c for c in at.checkbox if "LLM" in c.label]
+    assert matches, f"No checkbox with 'LLM' in its label found. All checkbox labels: {[c.label for c in at.checkbox]}"
+    checkbox = matches[0]
     assert checkbox.disabled is True
 
 
@@ -171,8 +174,11 @@ def test_llm_comparison_shows_both_results_when_enabled(monkeypatch):
     at = AppTest.from_file(str(APP_PATH))
     at.run(timeout=30)
     [b for b in at.sidebar.button if b.label == "Load corpus + train reranker"][0].click().run(timeout=60)
+    assert not at.exception, f"App crashed after loading corpus: {at.exception}"
 
-    checkbox = [c for c in at.checkbox if "LLM" in c.label][0]
+    matches = [c for c in at.checkbox if "LLM" in c.label]
+    assert matches, f"No checkbox with 'LLM' in its label found. All checkbox labels: {[c.label for c in at.checkbox]}"
+    checkbox = matches[0]
     assert checkbox.disabled is False  # key IS configured now, unlike the previous test
     checkbox.set_value(True)
     at.text_input(key="ask_question").set_value("What is Nikola Tesla known for?")
@@ -196,8 +202,11 @@ def test_llm_comparison_handles_failure_gracefully(monkeypatch):
     at = AppTest.from_file(str(APP_PATH))
     at.run(timeout=30)
     [b for b in at.sidebar.button if b.label == "Load corpus + train reranker"][0].click().run(timeout=60)
+    assert not at.exception, f"App crashed after loading corpus: {at.exception}"
 
-    checkbox = [c for c in at.checkbox if "LLM" in c.label][0]
+    matches = [c for c in at.checkbox if "LLM" in c.label]
+    assert matches, f"No checkbox with 'LLM' in its label found. All checkbox labels: {[c.label for c in at.checkbox]}"
+    checkbox = matches[0]
     checkbox.set_value(True)
     at.text_input(key="ask_question").set_value("What is Nikola Tesla known for?")
 
