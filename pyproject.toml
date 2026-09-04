@@ -10,3 +10,14 @@ requires-python = ">=3.10"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+# Without this, bare `pytest` (no arguments) recursively searches the
+# WHOLE project for test_*.py/*_test.py, not just tests/ -- this is
+# exactly what caused scripts/concurrent_load_test.py to get
+# accidentally collected and run as isolated pytest functions (never
+# executing its own if __name__ == "__main__" block that starts the
+# real server first, so every request failed with a connection error).
+# This makes bare `pytest` behave identically to this project's own,
+# established `pytest tests/` convention.
+testpaths = ["tests"]

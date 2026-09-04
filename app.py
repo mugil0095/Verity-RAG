@@ -27,6 +27,7 @@ to mean anything. Sharing it would mean only the very first visitor to
 ever click "Run the live streaming demo" sees a real demonstration --
 everyone after that would find Tesla already ingested.
 """
+import os
 import sys
 import time
 from pathlib import Path
@@ -43,6 +44,25 @@ DATA_DIR = Path(__file__).resolve().parent / "data"
 
 st.set_page_config(page_title="VerityRAG", page_icon="🔎", layout="wide")
 
+# gemini_complete_fn (llm_providers.py) reads GEMINI_API_KEY from
+# os.environ -- it predates this app and is also used from the CLI,
+# where that's the natural place to look. Streamlit's own secrets
+# mechanism (st.secrets) is separate from os.environ by default, so this
+# bridges the two rather than modifying the already-tested library
+# function to know about Streamlit specifically. st.secrets.get() itself
+# raises StreamlitSecretNotFoundError (not just returning None) when no
+# secrets.toml exists at all -- confirmed directly, not assumed -- so
+# this needs the same try/except usage_tracker.py's _get_secret() already
+# uses for exactly this reason. Silently does nothing if no secret is
+# configured -- same "optional feature, not core to the app working"
+# principle as usage_tracker.py's GITHUB_TOKEN handling.
+try:
+    _gemini_secret = st.secrets.get("GEMINI_API_KEY")
+except Exception:
+    _gemini_secret = None
+if _gemini_secret and not os.environ.get("GEMINI_API_KEY"):
+    os.environ["GEMINI_API_KEY"] = _gemini_secret
+
 
 # ----------------------------------------------------------------------
 # Shared, module-level pipeline -- one instance for every visitor, not
@@ -55,6 +75,34 @@ def _get_shared_pipeline():
 
 pipeline = _get_shared_pipeline()
 st.session_state.pipeline = pipeline  # same shared object, exposed for introspection/testing
+
+
+def _llm_comparison_available() -> bool:
+    return bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
+
+
+def _build_llm_comparison_agent():
+    """Shares the main pipeline's expensive, already-loaded resources
+    (index, embedder, reranker, sufficiency gate) -- only the generator
+    differs. Deliberately NOT cached: the reranker and sufficiency gate
+    on the shared pipeline.agent can change after this app starts (a
+    visitor training the reranker or calibrating later), and caching a
+    comparison agent built before that would hold a stale reference to
+    whatever those were at cache time. Constructing an AgentController
+    itself is cheap -- it only stores references, no heavy computation --
+    so building it fresh on every call is the simpler, correct choice."""
+    from verityrag.agent import AgentController
+    from verityrag.generation import LLMGenerator
+    from verityrag.llm_providers import gemini_complete_fn
+
+    return AgentController(
+        index=pipeline.index,
+        embedder=pipeline.embedder,
+        generator=LLMGenerator(complete_fn=gemini_complete_fn),
+        reranker_model=pipeline.agent.reranker_model,
+        sufficiency_gate=pipeline.agent.sufficiency_gate,
+        max_hops=pipeline.agent.max_hops,
+    )
 
 
 # ----------------------------------------------------------------------
@@ -140,10 +188,11 @@ with st.sidebar:
 
     st.divider()
     st.subheader("Add your own document")
-    st.caption("Added to the shared index everyone sees, not just this browser.")
+    st.caption("Added to the shared index everyone sees, not just this browser. "
+               "Limited to 200 / 5,000 chars — public, shared memory, kept bounded.")
     with st.form("add_doc", clear_on_submit=True):
-        title = st.text_input("Title")
-        text = st.text_area("Text", height=100)
+        title = st.text_input("Title", max_chars=200)
+        text = st.text_area("Text", height=100, max_chars=5000)
         if st.form_submit_button("Ingest", use_container_width=True) and title and text:
             n = pipeline.ingest_document(f"user-{int(time.time() * 1000)}", title, text)
             log_input("document", {"title": title, "text": text, "chunks_added": n})
@@ -151,7 +200,8 @@ with st.sidebar:
             st.rerun()
 
     st.divider()
-    if st.button("↺ Reset shared demo (clears index for everyone)", use_container_width=True):
+    confirm_reset = st.checkbox("I understand this clears the index for every current visitor, not just me")
+    if st.button("↺ Reset shared demo", use_container_width=True, disabled=not confirm_reset):
         _get_shared_pipeline.clear()  # invalidates the cached singleton -- next access builds a fresh one
         for key in list(st.session_state.keys()):
             del st.session_state[key]
@@ -163,13 +213,64 @@ with st.sidebar:
 # ----------------------------------------------------------------------
 tab_ask, tab_demo = st.tabs(["Ask a question", "Real-time streaming demo"])
 
+
+def _render_result(result, container=st):
+    """Renders one AgentResult's abstain/answer/grounding/claims/trace/
+    evidence -- factored out so the single-result and side-by-side LLM
+    comparison cases share the exact same display logic instead of
+    diverging into two separately-maintained code paths."""
+    if result.abstained:
+        container.warning(
+            "**Abstained** — the sufficiency gate didn't find confident, "
+            "relevant evidence, so no answer was generated rather than "
+            "risk a plausible-sounding guess."
+        )
+    else:
+        container.success(result.answer)
+        score = result.grounding.overall_score
+        container.progress(
+            score,
+            text=f"Grounding score: {score:.0%} — verdict: {result.grounding.verdict}",
+        )
+
+        with container.expander("Claim-level grounding breakdown"):
+            for claim in result.grounding.claims:
+                icon = "✅" if claim.is_grounded else "❌"
+                st.markdown(f"{icon} {claim.claim}")
+                st.caption(
+                    f"semantic support: {claim.semantic_support:.2f} · "
+                    f"lexical support: {claim.lexical_support:.2f}"
+                )
+
+    with container.expander("Agent trace (hops, reformulation, decisions)"):
+        for step in result.trace:
+            st.write(
+                f"**hop {step.hop} · {step.action}** — "
+                f"score={step.top_score:.3f} — query used: _{step.query_used!r}_"
+            )
+
+    if result.evidence:
+        with container.expander(f"Evidence used ({len(result.evidence)} chunks)"):
+            for e in result.evidence:
+                st.markdown(f"**{e.title}** — dense={e.dense_score:.3f}, lexical={e.lexical_score:.3f}")
+                st.caption(e.text)
+
+
 with tab_ask:
     st.header("Ask a question")
     if pipeline.index.size() == 0:
         st.info("Index is empty — load the demo corpus or add a document from the sidebar first.")
 
     question = st.text_input(
-        "Question", placeholder="e.g. What is Nikola Tesla known for?", key="ask_question"
+        "Question", placeholder="e.g. What is Nikola Tesla known for?", key="ask_question", max_chars=500
+    )
+
+    compare_with_llm = st.checkbox(
+        "Also show a real LLM's answer (Gemini) side-by-side — same retrieved evidence, "
+        "different generator, showcases this project's actual grounding/hallucination thesis",
+        disabled=not _llm_comparison_available(),
+        help=None if _llm_comparison_available() else
+             "Needs a GEMINI_API_KEY configured in this app's secrets to enable.",
     )
     ask_clicked = st.button("Ask", type="primary")
 
@@ -177,48 +278,47 @@ with tab_ask:
         with st.spinner("Retrieving → reranking → checking groundedness..."):
             result = pipeline.query(question)
 
-        log_input("question", {
+        log_payload = {
             "question": question,
             "abstained": result.abstained,
             "answer": result.answer,
             "grounding_score": result.grounding.overall_score if result.grounding else None,
-        })
+        }
 
-        if result.abstained:
-            st.warning(
-                "**Abstained** — the sufficiency gate didn't find confident, "
-                "relevant evidence, so no answer was generated rather than "
-                "risk a plausible-sounding guess."
-            )
+        if compare_with_llm:
+            col_extractive, col_llm = st.columns(2)
+            with col_extractive:
+                st.subheader("Extractive (default)")
+                _render_result(result, container=col_extractive)
+
+            with col_llm:
+                st.subheader("Real LLM (Gemini)")
+                try:
+                    with st.spinner("Calling Gemini..."):
+                        llm_agent = _build_llm_comparison_agent()
+                        llm_result = llm_agent.answer(question)
+                    _render_result(llm_result, container=col_llm)
+                    log_payload["llm_comparison"] = {
+                        "abstained": llm_result.abstained,
+                        "answer": llm_result.answer,
+                        "grounding_score": llm_result.grounding.overall_score if llm_result.grounding else None,
+                    }
+                except Exception as e:
+                    # Real, expected failure modes here: a free-tier daily
+                    # quota exhausted (llm_providers.py raises a clear
+                    # RuntimeError for this specifically), a transient
+                    # network issue, or any other real API failure. This
+                    # comparison is an optional extra, not core to the
+                    # app -- a visitor should still get their real,
+                    # working extractive answer on the left even if the
+                    # LLM side fails for any reason, not a crashed page.
+                    col_llm.error(f"LLM comparison unavailable right now: {e}")
+                    log_payload["llm_comparison_error"] = str(e)
+
         else:
-            st.success(result.answer)
-            score = result.grounding.overall_score
-            st.progress(
-                score,
-                text=f"Grounding score: {score:.0%} — verdict: {result.grounding.verdict}",
-            )
+            _render_result(result)
 
-            with st.expander("Claim-level grounding breakdown"):
-                for claim in result.grounding.claims:
-                    icon = "✅" if claim.is_grounded else "❌"
-                    st.markdown(f"{icon} {claim.claim}")
-                    st.caption(
-                        f"semantic support: {claim.semantic_support:.2f} · "
-                        f"lexical support: {claim.lexical_support:.2f}"
-                    )
-
-        with st.expander("Agent trace (hops, reformulation, decisions)"):
-            for step in result.trace:
-                st.write(
-                    f"**hop {step.hop} · {step.action}** — "
-                    f"score={step.top_score:.3f} — query used: _{step.query_used!r}_"
-                )
-
-        if result.evidence:
-            with st.expander(f"Evidence used ({len(result.evidence)} chunks)"):
-                for e in result.evidence:
-                    st.markdown(f"**{e.title}** — dense={e.dense_score:.3f}, lexical={e.lexical_score:.3f}")
-                    st.caption(e.text)
+        log_input("question", log_payload)
 
 with tab_demo:
     st.header("Real-time streaming demo")
@@ -226,29 +326,51 @@ with tab_demo:
         "Recreates scripts/demo_streaming.py in the browser: a topic is "
         "refused before it's ingested, streamed in live via a background "
         "thread, then answered immediately after — no restart. "
-        "Uses its own dedicated, pre-calibrated index, independent of the "
-        "sidebar (the sidebar's full corpus load includes Tesla from the "
-        "start, which would defeat the before/after contrast here)."
+        "Uses its own dedicated, pre-calibrated index (a 9-topic subset, "
+        "not the full corpus — kept smaller since, unlike the sidebar's "
+        "shared index, this one is per-visitor), independent of the "
+        "sidebar (whose full corpus load includes Tesla from the start, "
+        "which would defeat the before/after contrast here)."
     )
 
     if not _data_files_present():
         st.warning("Run `python data/build_corpus.py` first (see sidebar).")
     elif st.session_state.demo_pipeline is None:
-        st.info("This sets up a separate index (all topics except Tesla) and "
-                "calibrates it — takes ~20-30s, once.")
+        st.info("This sets up a separate, per-visitor index (a small topic "
+                 "subset, not the full corpus — see caption above) and "
+                 "calibrates it — takes ~10-15s, once.")
         if st.button("Set up demo"):
             with st.spinner("Ingesting corpus, training reranker, calibrating..."):
                 demo_pipeline = VerityRAGPipeline()
                 corpus = _load_json("corpus.json")
-                non_tesla_docs = [d for d in corpus if d["title"] != "Nikola_Tesla"]
-                demo_pipeline.ingest_documents(non_tesla_docs)
+                # A small, fixed topic subset, not "everything except Tesla" --
+                # this pipeline is per-session by necessity (each visitor needs
+                # a fresh "abstained before streaming" state), so unlike the
+                # shared main pipeline, its memory cost is paid by EVERY
+                # visitor who tries this tab, not once. The full non-Tesla
+                # corpus is 528 docs, nearly as large as the shared pipeline's
+                # own 620 -- on a ~1GB host, even 1-2 concurrent visitors
+                # trying this tab could exceed the budget. The demo's actual
+                # requirement is just "some genuine topic diversity, none of
+                # it Tesla" -- these two smallest topics (47 docs total) are
+                # more than enough for that.
+                demo_topics = {"Sky_(United_Kingdom)", "Victoria_(Australia)", "Southern_California",
+                               "Huguenot", "Normans", "Steam_engine", "Computational_complexity_theory",
+                               "Warsaw", "Super_Bowl_50"}
+                demo_docs = [d for d in corpus if d["title"] in demo_topics]
+                demo_pipeline.ingest_documents(demo_docs)
                 demo_pipeline.train_reranker(n_queries=200)
-                # exclude Tesla questions from calibration too, or calibration
-                # would implicitly "see" the topic this demo is about to stream in
+                # Filter ANSWERABLE calibration questions to the same topic
+                # subset, via source_title -- these are tied to a specific
+                # ingested topic, so this matters now that most of the 12
+                # topics aren't ingested for this demo. UNANSWERABLE questions
+                # need no such filtering: they're drawn from topics never in
+                # the corpus at all (a different field, excluded_topic, on
+                # entirely different source data) -- inherently unrelated to
+                # any of the 12 topics regardless of which subset is ingested.
                 answerable = [q for q in _load_json("eval_answerable.json")
-                              if "Tesla" not in q["question"]][:60]
-                unanswerable = [q for q in _load_json("eval_unanswerable.json")
-                                if "Tesla" not in q["question"]][:60]
+                              if q["source_title"] in demo_topics][:60]
+                unanswerable = _load_json("eval_unanswerable.json")[:60]
                 demo_pipeline.calibrate_sufficiency(
                     [q["question"] for q in answerable],
                     [q["question"] for q in unanswerable],
