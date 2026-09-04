@@ -117,3 +117,19 @@ track record); documented as an opt-in in the README instead.
   discovery conventions), never starting the real server it needs.
   Fixed with `testpaths = ["tests"]` in `pyproject.toml` plus renaming
   the file to `concurrent_load_check.py`.
+
+**2026-09-04** — Fixed a real CI failure (`test_reset_button_clears_the_index`)
+that hadn't shown up locally: `at.sidebar.checkbox[0].set_value(True)` was
+called with no `.run()` after it, then the very next line grabbed and
+clicked the Reset button — but `AppTest` checks a button's `disabled`
+state against the *last completed run*, not any pending change, so the
+button still reflected its pre-checkbox-change (`disabled=True`) state
+and the click correctly errored. Fixed by chaining `.run(timeout=30)`
+right after the checkbox's `set_value()`, matching the pattern already
+used correctly elsewhere in the same file. Notably didn't reproduce with
+an older locally-cached `streamlit` (1.61.1) but did with a newer one
+(1.62.0, likely closer to what CI installs) — `requirements.txt` doesn't
+pin `streamlit`'s version, so this was a real latent bug in the test
+itself (relying on an older version's more lenient behavior), not
+something introduced by an unrelated change. Verified with the newer
+version installed: all 122 tests pass.

@@ -6,6 +6,7 @@ Skipped if data/corpus.json hasn't been built yet -- same convention as
 test_eval_regression.py.
 """
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -133,7 +134,7 @@ def test_reset_button_clears_the_index():
     [b for b in at.sidebar.button if "Ingest" in b.label][0].click().run(timeout=30)
     assert at.session_state.pipeline.index.size() > 0
 
-    at.sidebar.checkbox[0].set_value(True)  # must confirm before Reset is enabled
+    at.sidebar.checkbox[0].set_value(True).run(timeout=30)  # must confirm AND re-run before Reset is enabled
     reset_btn = [b for b in at.sidebar.button if "Reset" in b.label][0]
     reset_btn.click().run(timeout=30)
     assert not at.exception
@@ -148,3 +149,63 @@ def test_reset_button_disabled_without_confirmation():
     at.run(timeout=30)
     reset_btn = [b for b in at.sidebar.button if "Reset" in b.label][0]
     assert reset_btn.disabled is True
+
+
+def test_llm_comparison_checkbox_disabled_without_api_key(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    at = AppTest.from_file(str(APP_PATH))
+    at.run(timeout=30)
+    checkbox = [c for c in at.checkbox if "LLM" in c.label][0]
+    assert checkbox.disabled is True
+
+
+def test_llm_comparison_shows_both_results_when_enabled(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-test-key")
+
+    mock_response = MagicMock()
+    mock_response.text = "Tesla contributed major advances to AC electrical systems."
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = mock_response
+
+    at = AppTest.from_file(str(APP_PATH))
+    at.run(timeout=30)
+    [b for b in at.sidebar.button if b.label == "Load corpus + train reranker"][0].click().run(timeout=60)
+
+    checkbox = [c for c in at.checkbox if "LLM" in c.label][0]
+    assert checkbox.disabled is False  # key IS configured now, unlike the previous test
+    checkbox.set_value(True)
+    at.text_input(key="ask_question").set_value("What is Nikola Tesla known for?")
+
+    with patch("google.genai.Client", return_value=mock_client):
+        [b for b in at.button if b.label == "Ask"][0].click().run(timeout=30)
+
+    assert not at.exception
+    subheaders = [h.value for h in at.subheader]
+    assert "Extractive (default)" in subheaders
+    assert "Real LLM (Gemini)" in subheaders
+    mock_client.models.generate_content.assert_called_once()
+
+
+def test_llm_comparison_handles_failure_gracefully(monkeypatch):
+    """The extractive answer must still work even when the LLM side fails
+    for any reason -- this is the actual point of the try/except in
+    app.py, not just that a comparison generally works."""
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-test-key")
+
+    at = AppTest.from_file(str(APP_PATH))
+    at.run(timeout=30)
+    [b for b in at.sidebar.button if b.label == "Load corpus + train reranker"][0].click().run(timeout=60)
+
+    checkbox = [c for c in at.checkbox if "LLM" in c.label][0]
+    checkbox.set_value(True)
+    at.text_input(key="ask_question").set_value("What is Nikola Tesla known for?")
+
+    with patch("google.genai.Client", side_effect=RuntimeError("simulated daily quota exceeded")):
+        [b for b in at.button if b.label == "Ask"][0].click().run(timeout=30)
+
+    assert not at.exception  # the failure must be caught, not crash the app
+    subheaders = [h.value for h in at.subheader]
+    assert "Extractive (default)" in subheaders  # still rendered despite the LLM side failing
+    error_messages = [e.value for e in at.error]
+    assert any("LLM comparison unavailable" in msg for msg in error_messages)
