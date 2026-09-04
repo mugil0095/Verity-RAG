@@ -133,7 +133,18 @@ def test_reset_button_clears_the_index():
     [b for b in at.sidebar.button if "Ingest" in b.label][0].click().run(timeout=30)
     assert at.session_state.pipeline.index.size() > 0
 
+    at.sidebar.checkbox[0].set_value(True)  # must confirm before Reset is enabled
     reset_btn = [b for b in at.sidebar.button if "Reset" in b.label][0]
     reset_btn.click().run(timeout=30)
     assert not at.exception
     assert at.session_state.pipeline.index.size() == 0
+
+
+def test_reset_button_disabled_without_confirmation():
+    """The confirmation checkbox is the actual point of this change --
+    make sure Reset genuinely can't fire without it, not just that the
+    checkbox exists."""
+    at = AppTest.from_file(str(APP_PATH))
+    at.run(timeout=30)
+    reset_btn = [b for b in at.sidebar.button if "Reset" in b.label][0]
+    assert reset_btn.disabled is True

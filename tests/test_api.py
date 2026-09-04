@@ -64,3 +64,13 @@ def test_stats_endpoint_reports_index_size(client):
     resp = client.get("/stats")
     assert resp.status_code == 200
     assert resp.json()["index_size"] >= 1
+
+
+def test_ingest_rejects_oversized_text(client):
+    response = client.post("/ingest", json={"doc_id": "x", "title": "x", "text": "y" * 5001})
+    assert response.status_code == 422
+
+
+def test_query_rejects_oversized_question(client):
+    response = client.post("/query", json={"question": "y" * 501})
+    assert response.status_code == 422

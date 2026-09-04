@@ -15,7 +15,7 @@ useful for calling /ingest and /query by hand without curl/Postman.
 from __future__ import annotations
 
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .pipeline import VerityRAGPipeline
 
@@ -24,13 +24,13 @@ pipeline = VerityRAGPipeline()
 
 
 class IngestRequest(BaseModel):
-    doc_id: str
-    title: str
-    text: str
+    doc_id: str = Field(max_length=200)
+    title: str = Field(max_length=200)
+    text: str = Field(max_length=5000)
 
 
 class QueryRequest(BaseModel):
-    question: str
+    question: str = Field(max_length=500)
 
 
 class ClaimOut(BaseModel):

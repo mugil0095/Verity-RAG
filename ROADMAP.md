@@ -7,6 +7,54 @@ Nothing currently open — see Log for what's next up for grabs, or start a
 new thread.
 
 ## Done
+- [x] **Found and fixed a second, separate memory gap in the live app: the
+  streaming demo tab's per-visitor corpus.** The main pipeline's
+  shared-singleton fix (see below) addressed the shared index's memory
+  cost, but a follow-up review caught a real, separate problem in the
+  same app: the streaming demo tab's `demo_pipeline` is per-session by
+  necessity (each visitor needs a fresh "abstained before streaming"
+  state for the before/after contrast to work at all), which means every
+  visitor who tries that tab allocates their own full-size vector
+  matrix, on top of the shared main pipeline's own ~422MB. The original
+  "all topics except Tesla" approach ingested 528 docs per visitor,
+  nearly as large as the main corpus itself — on a ~1GB host, even 1-2
+  concurrent visitors trying this tab could have exceeded the budget.
+  Reduced to a fixed 9-topic subset (372 docs) — not a guessed number:
+  checked the actual constraint directly first (an initial 2-topic
+  attempt only had 14 answerable calibration questions available,
+  clearly in the degraded small-sample regime this project's own earlier
+  calibration-size investigation had already measured), then verified
+  the reduced corpus empirically — ran the exact scripted scenario
+  (abstain before streaming, answer correctly with perfect grounding
+  after, still abstain on a genuinely out-of-domain question) both
+  directly and through the real Streamlit `AppTest` flow before trusting
+  it.
+- [x] **Hardened the now-live, public app: input size limits, reset
+  confirmation, non-blocking tracker.** Once app.py's pipeline became a
+  shared singleton (see below) and the app went live on Streamlit
+  Community Cloud, three real gaps became actual, not hypothetical:
+  (1) no length limit on the public "add document"/"ask a question"
+  fields — one large submission could eat a meaningful chunk of the
+  ~1GB host budget for every current visitor, not just the submitter.
+  Fixed with `max_chars` (200/5,000/500) on both `app.py`'s Streamlit
+  widgets and `api.py`'s Pydantic models, for consistency across both
+  entry points to the same pipeline. (2) The "Reset shared demo" button
+  fired on one click with no confirmation, wiping the index for every
+  current visitor. Now requires ticking a checkbox first — doesn't
+  prevent deliberate abuse (would need real auth for that), but stops
+  accidental clicks and makes the shared-state consequence visible
+  before it happens. (3) `usage_tracker.log_input()` made a synchronous
+  `requests.put()` with a 10s timeout on every single submission — a
+  slow GitHub response or network hiccup meant up to 10 seconds of
+  added delay on a "real-time" app, for a background tracking call
+  unrelated to the actual answer. Fixed by spawning the actual GitHub
+  commit on a background thread; `log_input()` now returns immediately.
+  The secret itself is still read on the calling thread first (Streamlit
+  secrets need script-run context, which a background thread doesn't
+  have) — only the plain HTTP call moved to the thread. New tests for
+  all three, including a `threading.Event`-based test proving the
+  non-blocking behavior deterministically rather than assuming it from
+  a fixed sleep.
 - [x] **Built `usage_tracker.py`: logs real demo inputs (questions asked,
   documents added) to a separate, private tracking repo.** One JSON file
   per submission (timestamp + random suffix — avoids any race condition
@@ -250,3 +298,18 @@ new thread.
   separate, private tracking repo via the GitHub Contents API. Fails
   silently on any error (missing token, network, rate limit) — never
   blocks or breaks a visitor's actual request
+- 2026-08-25 — App is now live and public (Streamlit Community Cloud):
+  added CLAUDE.md for Claude Code project memory, added input size
+  limits to app.py and api.py (a shared pipeline means one large
+  submission now affects every current visitor), added a confirmation
+  checkbox before the shared reset button fires, and fixed
+  usage_tracker.log_input() to spawn its GitHub commit on a background
+  thread instead of blocking every submission on a synchronous call with
+  a 10s timeout
+- 2026-08-25 — Follow-up review caught a second, separate memory gap:
+  the streaming demo tab's per-visitor pipeline (correctly per-session by
+  design) was ingesting 528 docs per visitor, nearly as large as the
+  shared main corpus. Reduced to a 9-topic, 372-doc subset — checked
+  against real calibration-size constraints first, then verified the
+  scripted demo scenario still works correctly, both directly and
+  through the real AppTest flow

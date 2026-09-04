@@ -140,10 +140,11 @@ with st.sidebar:
 
     st.divider()
     st.subheader("Add your own document")
-    st.caption("Added to the shared index everyone sees, not just this browser.")
+    st.caption("Added to the shared index everyone sees, not just this browser. "
+               "Limited to 200 / 5,000 chars — public, shared memory, kept bounded.")
     with st.form("add_doc", clear_on_submit=True):
-        title = st.text_input("Title")
-        text = st.text_area("Text", height=100)
+        title = st.text_input("Title", max_chars=200)
+        text = st.text_area("Text", height=100, max_chars=5000)
         if st.form_submit_button("Ingest", use_container_width=True) and title and text:
             n = pipeline.ingest_document(f"user-{int(time.time() * 1000)}", title, text)
             log_input("document", {"title": title, "text": text, "chunks_added": n})
@@ -151,7 +152,8 @@ with st.sidebar:
             st.rerun()
 
     st.divider()
-    if st.button("↺ Reset shared demo (clears index for everyone)", use_container_width=True):
+    confirm_reset = st.checkbox("I understand this clears the index for every current visitor, not just me")
+    if st.button("↺ Reset shared demo", use_container_width=True, disabled=not confirm_reset):
         _get_shared_pipeline.clear()  # invalidates the cached singleton -- next access builds a fresh one
         for key in list(st.session_state.keys()):
             del st.session_state[key]
@@ -169,7 +171,7 @@ with tab_ask:
         st.info("Index is empty — load the demo corpus or add a document from the sidebar first.")
 
     question = st.text_input(
-        "Question", placeholder="e.g. What is Nikola Tesla known for?", key="ask_question"
+        "Question", placeholder="e.g. What is Nikola Tesla known for?", key="ask_question", max_chars=500
     )
     ask_clicked = st.button("Ask", type="primary")
 
@@ -226,29 +228,51 @@ with tab_demo:
         "Recreates scripts/demo_streaming.py in the browser: a topic is "
         "refused before it's ingested, streamed in live via a background "
         "thread, then answered immediately after — no restart. "
-        "Uses its own dedicated, pre-calibrated index, independent of the "
-        "sidebar (the sidebar's full corpus load includes Tesla from the "
-        "start, which would defeat the before/after contrast here)."
+        "Uses its own dedicated, pre-calibrated index (a 9-topic subset, "
+        "not the full corpus — kept smaller since, unlike the sidebar's "
+        "shared index, this one is per-visitor), independent of the "
+        "sidebar (whose full corpus load includes Tesla from the start, "
+        "which would defeat the before/after contrast here)."
     )
 
     if not _data_files_present():
         st.warning("Run `python data/build_corpus.py` first (see sidebar).")
     elif st.session_state.demo_pipeline is None:
-        st.info("This sets up a separate index (all topics except Tesla) and "
-                "calibrates it — takes ~20-30s, once.")
+        st.info("This sets up a separate, per-visitor index (a small topic "
+                 "subset, not the full corpus — see caption above) and "
+                 "calibrates it — takes ~10-15s, once.")
         if st.button("Set up demo"):
             with st.spinner("Ingesting corpus, training reranker, calibrating..."):
                 demo_pipeline = VerityRAGPipeline()
                 corpus = _load_json("corpus.json")
-                non_tesla_docs = [d for d in corpus if d["title"] != "Nikola_Tesla"]
-                demo_pipeline.ingest_documents(non_tesla_docs)
+                # A small, fixed topic subset, not "everything except Tesla" --
+                # this pipeline is per-session by necessity (each visitor needs
+                # a fresh "abstained before streaming" state), so unlike the
+                # shared main pipeline, its memory cost is paid by EVERY
+                # visitor who tries this tab, not once. The full non-Tesla
+                # corpus is 528 docs, nearly as large as the shared pipeline's
+                # own 620 -- on a ~1GB host, even 1-2 concurrent visitors
+                # trying this tab could exceed the budget. The demo's actual
+                # requirement is just "some genuine topic diversity, none of
+                # it Tesla" -- these two smallest topics (47 docs total) are
+                # more than enough for that.
+                demo_topics = {"Sky_(United_Kingdom)", "Victoria_(Australia)", "Southern_California",
+                               "Huguenot", "Normans", "Steam_engine", "Computational_complexity_theory",
+                               "Warsaw", "Super_Bowl_50"}
+                demo_docs = [d for d in corpus if d["title"] in demo_topics]
+                demo_pipeline.ingest_documents(demo_docs)
                 demo_pipeline.train_reranker(n_queries=200)
-                # exclude Tesla questions from calibration too, or calibration
-                # would implicitly "see" the topic this demo is about to stream in
+                # Filter ANSWERABLE calibration questions to the same topic
+                # subset, via source_title -- these are tied to a specific
+                # ingested topic, so this matters now that most of the 12
+                # topics aren't ingested for this demo. UNANSWERABLE questions
+                # need no such filtering: they're drawn from topics never in
+                # the corpus at all (a different field, excluded_topic, on
+                # entirely different source data) -- inherently unrelated to
+                # any of the 12 topics regardless of which subset is ingested.
                 answerable = [q for q in _load_json("eval_answerable.json")
-                              if "Tesla" not in q["question"]][:60]
-                unanswerable = [q for q in _load_json("eval_unanswerable.json")
-                                if "Tesla" not in q["question"]][:60]
+                              if q["source_title"] in demo_topics][:60]
+                unanswerable = _load_json("eval_unanswerable.json")[:60]
                 demo_pipeline.calibrate_sufficiency(
                     [q["question"] for q in answerable],
                     [q["question"] for q in unanswerable],
