@@ -80,84 +80,53 @@ fit on.
 
 ## Design decisions (and the bugs behind them)
 
-**No pretrained embedding model by default.** Built without a route to
-the HuggingFace Hub, so `HashingEmbedder` uses a stateless hashed
-bag-of-n-grams transform instead of sentence-transformers. That
-statelessness is a real advantage for real-time ingestion, but raw
-hashed vectors have no IDF weighting — stopwords swamped the topical
-signal until filtering was added. A real encoder (`SentenceTransformerEmbedder`)
-is available as an opt-in swap behind the same interface — see below.
+Full detail on any of these — including exact numbers, root causes, and
+the diagnostic process — is in [ROADMAP.md](ROADMAP.md). Summarized here:
 
-**The lexical tokenizer didn't strip punctuation.** Found while comparing
-against Elasticsearch (see "Swapping in Elasticsearch" below): `rank_bm25`'s
-tokenizer was `text.lower().split()` — pure whitespace splitting, so
-`"Tesla,"` and `"Tesla"` were different tokens and would never match each
-other. Elasticsearch's default analyzer strips punctuation correctly, and
-swapping it in changed real eval numbers (guard 73.3% → 78.7%) despite both
-being BM25-family scoring — that gap is what surfaced the bug. Fixed to a
-proper regex tokenizer; closed ~74% of the original gap. Real, honest
-trade-off: guard improved (73.3% → 77.3%) but coverage dropped slightly
-(96% → 93.3%) — some of the old broken tokenizer's punctuation-attached
-matches were apparently helping a couple of answerable questions pass the
-sufficiency gate by accident. Kept the fix regardless, since correct
-tokenization isn't optional just because a bug happened to help sometimes.
-
-**A single relevance threshold doesn't separate answerable from
-unanswerable questions.** On-topic and off-topic-but-keyword-overlapping
-questions had heavily overlapping score distributions — no one number
-cleanly separates them. Fixed with a small LightGBM classifier
-(`sufficiency.py`) trained on multiple retrieval features instead.
-
-**Query reformulation was amplifying hallucination risk.** The agent's
-retry logic (expand the query using the best candidate so far) assumes
-the first pass found something relevant to refine. For genuinely
-out-of-domain questions it pulled the search toward a wrong match instead
-of away from it. Hallucination guard was 9.3% with unconditional
-reformulation, 77.3% once reformulation was gated on the sufficiency
-classifier's own confidence. Locked in with a regression test.
-
-**Bulk ingestion was accidentally O(n²).** `rank_bm25` has no incremental
-update API, so adding documents one at a time rebuilt the entire lexical
-index every call — 61s for the initial corpus. Bulk loading now chunks
-everything first and rebuilds once: 61s → 2.7s. True streaming ingestion
-still rebuilds per document by design (documents need to be searchable
-immediately) at a real cost (~430ms/doc) — `elasticsearch_index.py` is
-the production fix, see below.
-
-**Real embeddings crashed on Windows, twice.** Loading `sentence-transformers`
-(PyTorch) alongside scikit-learn and LightGBM (both MKL-linked) triggered
-a `STATUS_ACCESS_VIOLATION` — conflicting OpenMP runtimes. Fixed at load
-time with `KMP_DUPLICATE_LIB_OK=TRUE`. A second crash showed up ~100
-questions into a real eval run from thread-pool contention under
-sustained use; fixed with `OMP_NUM_THREADS=1`. Both are real fixes for a
-real class of issue, but forcing single-threaded execution is also why
-real embeddings pay a latency tax beyond what CPU inference alone costs.
-
-Found a real, measured ~15% latency improvement since (p50 2175ms→1855ms,
-p95 4087ms→3443ms, identical accuracy) by setting `MKL_THREADING_LAYER=GNU`
-instead of `OMP_NUM_THREADS=1` — worth trying if the extra speed matters
-to you. Not made the default: the original crash specifically needed
-sustained use to show up, and this alternative has only been confirmed
-across two full-eval runs so far, meaningfully less runtime than
-`OMP_NUM_THREADS=1`'s stable track record across this whole project. A
-crash is worse than "a bit slow," so this is offered as an opt-in, not a
-replacement, until it's been proven under more sustained use (e.g. the
-Streamlit streaming demo running for an extended period).
-
-**Concurrency was designed in but never actually load-tested until it
-was.** `LiveIndex` (indexing.py) uses `threading.RLock()` around both
-reads and writes specifically so ingestion and queries can happen at the
-same time — the real-time thesis requires it. That was reasoned about
-from the code, not verified, until `scripts/concurrent_load_test.py`
-actually started the real FastAPI server and fired genuine concurrent
-HTTP traffic at it: 30 simultaneous `/ingest` calls (final index size
-exactly matched what was sent, no lost updates), 30 simultaneous
-`/query` calls, and 100 concurrent mixed ingest+query calls, all with
-zero errors. The key detail that makes this correct: `VectorIndex.add()`
-uses `np.vstack` to build a brand-new array rather than mutating one in
-place, so a reader holding a reference from an earlier snapshot stays
-valid even if a write happens concurrently and reassigns the underlying
-array to something else.
+- **No pretrained embedding model by default.** `HashingEmbedder` is a
+  stateless hashed bag-of-n-grams transform — a real advantage for
+  real-time ingestion, but stopwords swamped the topical signal until
+  filtering was added. `SentenceTransformerEmbedder` is an opt-in swap
+  behind the same interface (see "Real embeddings, measured").
+- **The lexical tokenizer didn't strip punctuation.** Found by comparing
+  against Elasticsearch: `rank_bm25`'s tokenizer was pure whitespace
+  splitting, so `"Tesla,"` and `"Tesla"` never matched. Fixed to a proper
+  regex tokenizer. Real trade-off: guard improved (73.3%→77.3%) but
+  coverage dropped slightly (96%→93.3%) — some of the old bug's
+  punctuation-attached matches were accidentally helping a few questions
+  pass the sufficiency gate.
+- **A single relevance threshold doesn't separate answerable from
+  unanswerable questions** — their score distributions heavily overlap.
+  Fixed with a small LightGBM classifier (`sufficiency.py`) trained on
+  multiple retrieval features instead.
+- **Query reformulation was amplifying hallucination risk.** The retry
+  logic assumed the first pass found something relevant to refine; for
+  genuinely out-of-domain questions it pulled the search toward a wrong
+  match instead of away. Guard was 9.3% with unconditional reformulation,
+  77.3% once gated on the sufficiency classifier's own confidence.
+- **Bulk ingestion was accidentally O(n²)** — `rank_bm25` has no
+  incremental update API, so adding documents one at a time rebuilt the
+  entire lexical index every call (61s for the initial corpus). Bulk
+  loading now chunks everything first and rebuilds once: 61s → 2.7s.
+  True streaming ingestion still rebuilds per document by design
+  (~430ms/doc) — Elasticsearch is the production fix (see below).
+- **Real embeddings crashed on Windows, twice** — a `STATUS_ACCESS_VIOLATION`
+  from conflicting OpenMP runtimes (PyTorch + MKL-linked scikit-learn/
+  LightGBM), fixed at load time; a second crash from thread-pool
+  contention under sustained use, fixed with `OMP_NUM_THREADS=1`. Both
+  real fixes, but forcing single-threaded execution is part of why real
+  embeddings pay a latency tax. A later, real ~15% latency improvement
+  (`MKL_THREADING_LAYER=GNU`) is available as an opt-in but not the
+  default — the crash it works around needed sustained use to surface,
+  and this alternative has less runtime behind it so far.
+- **Concurrency was designed in but never actually load-tested** —
+  `LiveIndex` uses `threading.RLock()` around reads and writes so
+  ingestion and queries can happen at once, reasoned about but not
+  verified until `scripts/concurrent_load_check.py` fired genuine
+  concurrent HTTP traffic at a real running server: zero errors across
+  160+ concurrent ingest/query calls. Holds up because `VectorIndex.add()`
+  builds a brand-new array (`np.vstack`) rather than mutating one in
+  place, so a reader's snapshot stays valid through a concurrent write.
 
 ## Real embeddings, measured
 
@@ -172,34 +141,18 @@ array to something else.
 | Avg grounding score | 1.0 | 1.0 |
 | Latency, p50 | ~58ms | ~2,175ms |
 
-Re-verified after the tokenizer fix (see "Design decisions" above) — and
-the effect was much larger here than for the default path (guard
-73.3%→77.3% there, vs. 82.7%→96% here). That's not a coincidence: the
-real-embeddings-trained sufficiency classifier relies on lexical score as
-its single most important feature (confirmed directly via
-`feature_importances_` — see ROADMAP.md), more than the `HashingEmbedder`
-classifier does. A bug in exactly that layer naturally hit the classifier
-that depends on it most. Unlike the default path, every metric improved
-together here — no coverage/guard trade-off this time.
-
-A real encoder still closes a meaningful chunk of the hallucination-guard
-gap on its own terms, and latency is still the real cost — part of that
-from the Windows workaround above, part from matching evidence at
-sentence granularity instead of whole chunks (a separate fix: comparing a
-claim against a whole multi-sentence chunk diluted its similarity score,
-so a claim could score 1.0 against its own source sentence in isolation
-but only 0.41 against the chunk containing it).
-
-This is why it isn't the pipeline default — for a system positioned as
-real-time, the latency cost isn't currently justified by the guard
-improvement. Swap it in explicitly where the trade-off is worth it.
+The tokenizer fix above hit this path much harder (guard 82.7%→96% here,
+vs. 73.3%→77.3% for the default) because the real-embeddings-trained
+sufficiency classifier relies on lexical score as its single most
+important feature. Latency is why this isn't the default — real-time
+positioning doesn't currently justify the cost. Swap it in explicitly
+where the trade-off is worth it.
 
 ## Real LLM generation
 
 `ExtractiveGenerator` (default) stitches sentences straight from
-evidence — grounded by construction, but the grounding checker has never
-been tested against a real hallucination this way. `LLMGenerator` calls a
-real model instead:
+evidence — grounded by construction. `LLMGenerator` calls a real model
+instead:
 
 ```python
 from verityrag.pipeline import VerityRAGPipeline
@@ -215,41 +168,28 @@ pipeline = VerityRAGPipeline(generator=LLMGenerator(complete_fn=gemini_complete_
 | Cost | Small starter credit, then pay-per-token | Genuine free tier, no card needed |
 | Default model | `claude-sonnet-5` | `gemini-3.6-flash` |
 
-Confirmed working end-to-end against the live Gemini API — a real query
-answered correctly and passed the grounding check; a deliberately
-unrelated response was correctly caught and abstained. First small-sample
-run (n=8+8): hallucination guard **100%**, coverage 50%. Traced the
-coverage gap directly rather than leaving it unexplained: both
-wrongly-abstained cases were the LLM honestly saying it couldn't find the
-answer in what was actually retrieved — checked the raw retrieved
-candidates directly, the gold-answer chunk genuinely wasn't in the top-6.
-A retrieval gap, not an LLM or grounding-checker problem (see ROADMAP.md).
-Re-run after the tokenizer fix (see "Design decisions" above): coverage
-and guard unchanged exactly (0.5, 1.0) — the one number that moved
-(avg grounding score, 1.0→0.875) is fully explained by simple arithmetic
-on 4 attempted questions (three at 1.0, one at 0.5), within the run-to-run
-noise already expected here — LLM generation isn't perfectly
-deterministic, confirmed earlier by this same 8-question sample producing
-a different success count on an unrelated prior run. The free tier's
-daily quota is real and can be quite restrictive for a new model (a live
-429 showed a 20-request/day cap), so the full 150-question eval doesn't
-fit in one day. `--max-test-questions N` caps how many questions actually
-get sent to the LLM, for an honest partial measurement instead:
+Confirmed working end-to-end against the live Gemini API. First
+small-sample run (n=8+8): hallucination guard **100%**, coverage 50% —
+traced directly to a genuine retrieval gap (the gold-answer chunk
+genuinely wasn't in the top-6), not an LLM or grounding-checker problem.
+The free tier's daily quota is real and restrictive (~20 requests/day),
+so `--max-test-questions N` caps how many questions actually get sent,
+for an honest partial measurement (`partial_sample` field in the report)
+instead of an infeasible full run:
 
 ```
 python -m verityrag.eval --real-llm gemini --max-test-questions 8
 ```
 
-The report marks this explicitly (`partial_sample` field) — a
-small-sample number is real but less statistically precise than a full
-run.
+Also live in the deployed app: check "Also show a real LLM's answer" on
+the Ask tab to see both generators answer the same question side by
+side, off the exact same retrieved evidence.
 
 ## Swapping in Elasticsearch
 
 `LexicalIndex` (the `rank_bm25`-based default) has no incremental
-indexing API — adding one document rebuilds the *entire* lexical index
-(see "Design decisions" above). `ElasticsearchLexicalIndex`
-(`elasticsearch_index.py`) is a drop-in swap with genuine incremental
+indexing API — adding one document rebuilds the *entire* lexical index.
+`ElasticsearchLexicalIndex` is a drop-in swap with genuine incremental
 indexing:
 
 ```python
@@ -259,28 +199,19 @@ from verityrag.elasticsearch_index import ElasticsearchLexicalIndex
 pipeline = VerityRAGPipeline(lexical_index=ElasticsearchLexicalIndex())
 ```
 
-Needs `pip install elasticsearch` and a running Elasticsearch instance
-(not bundled — for local dev, disable security in `elasticsearch.yml`
-with `xpack.security.enabled: false` and `discovery.type: single-node`,
-and cap the JVM heap via `config/jvm.options.d/heap.options` rather than
-trusting its default auto-sizing).
+Needs `pip install elasticsearch` and a running instance (not bundled —
+for local dev, disable security in `elasticsearch.yml` and cap the JVM
+heap explicitly rather than trusting auto-sizing).
 
-Measured against a real, running instance, not just mocks — two honest
-findings, neither the "obvious" one. First, eval numbers weren't
-identical between the two lexical backends despite both being BM25-family
-scoring: comparing them is what surfaced the tokenizer bug described in
-"Design decisions" above. Second, at this project's actual corpus size
-(845 chunks), Elasticsearch is not faster: `rank_bm25`'s full rebuild
-measured 206.0ms/doc median vs. Elasticsearch's 221.7ms/doc — Elasticsearch
-is *slower* here, not the clean win the architecture would suggest.
-Elasticsearch's fixed per-call overhead (a network round-trip plus an
-explicit index refresh, required for real-time visibility — see
-`elasticsearch_index.py`) apparently exceeds rank_bm25's actual rebuild
-cost at this scale. The architectural principle remains sound — `rank_bm25`'s
-cost grows with corpus size, Elasticsearch's doesn't — but the crossover
-point where that pays off measurably hasn't been reached by this specific
-corpus. Reported honestly rather than only measuring at a scale picked to
-make the swap look good.
+Measured against a real running instance, not mocks: comparing it
+against `rank_bm25` is what surfaced the tokenizer bug above. At this
+project's actual corpus size (845 chunks), Elasticsearch is not faster —
+206.0ms/doc (`rank_bm25`) vs. 221.7ms/doc (Elasticsearch) — its fixed
+per-call overhead (network round-trip + explicit refresh) exceeds
+`rank_bm25`'s rebuild cost at this scale. The architectural principle
+still holds for a larger corpus; this one hasn't reached the crossover
+point yet, reported honestly rather than only measured at a scale picked
+to make the swap look good.
 
 ## Known limitations
 
@@ -294,6 +225,11 @@ Tracked as an actual backlog in [ROADMAP.md](ROADMAP.md).
   cost (see above).
 - **Streaming throughput** is bounded by the BM25 rebuild cost described
   above — fine for a trickle of documents, not bulk-loading thousands live.
+- **The live demo's LLM comparison feature shares one Gemini API key
+  across every visitor** — the free tier's daily quota is shared too,
+  not per-visitor. Handled gracefully (a clear error on the LLM side,
+  extractive answer still works) rather than crashing, but it's a real,
+  known constraint of a free-tier key on a public app.
 
 ## Running it
 
@@ -312,10 +248,12 @@ streamlit run app.py              # recommended for demoing
 ### Streamlit frontend
 
 Two tabs: **Ask a question** (load the corpus, calibrate, ask anything —
-see the answer, grounding score, and agent trace) and **Real-time
-streaming demo** (watch a question get refused, documents stream in live,
-the same question get answered, and a genuinely out-of-domain question
-stay correctly refused). Covered by its own `AppTest`-based test suite.
+see the answer, grounding score, and agent trace; optionally, if a
+`GEMINI_API_KEY` is configured, compare the extractive and LLM
+generators side-by-side) and **Real-time streaming demo** (watch a
+question get refused, documents stream in live, the same question get
+answered, and a genuinely out-of-domain question stay correctly
+refused). Covered by its own `AppTest`-based test suite.
 
 ### Minimal usage
 
