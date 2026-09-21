@@ -211,8 +211,7 @@ with st.sidebar:
 # ----------------------------------------------------------------------
 # Main area
 # ----------------------------------------------------------------------
-tab_ask, tab_demo = st.tabs(["Ask a question", "Real-time streaming demo"])
-
+tab_ask, tab_demo, tab_chat = st.tabs(["Ask a question", "Real-time streaming demo", "Conversation"])
 
 def _render_result(result, container=st):
     """Renders one AgentResult's abstain/answer/grounding/claims/trace/
@@ -435,3 +434,48 @@ with tab_demo:
                 st.session_state.demo_after = None
                 st.session_state.demo_unanswerable = None
                 st.rerun()
+
+with tab_chat:
+    st.header("Conversation")
+    st.caption(
+        "Follow-up questions carry context from the previous turn into "
+        "retrieval — e.g. asking \"what about his early life?\" right after "
+        "a Tesla question. A simple, honest heuristic (the prior question's "
+        "text is prepended for retrieval only, not an LLM-based rewrite), "
+        "using the same shared index as the Ask tab."
+    )
+    if pipeline.index.size() == 0:
+        st.info("Index is empty — load the demo corpus or add a document from the sidebar first.")
+
+    if "conversation" not in st.session_state:
+        st.session_state.conversation = []
+
+    for turn in st.session_state.conversation:
+        with st.chat_message("user"):
+            st.write(turn["question"])
+        with st.chat_message("assistant"):
+            _render_result(turn["result"])
+
+    if st.session_state.conversation and st.button("↺ New conversation"):
+        st.session_state.conversation = []
+        st.rerun()
+
+    followup = st.chat_input("Ask a follow-up...")
+    if followup:
+        if st.session_state.conversation:
+            prior_question = st.session_state.conversation[-1]["question"]
+            retrieval_query = f"{prior_question} {followup}"
+        else:
+            retrieval_query = followup
+
+        with st.spinner("Retrieving → reranking → checking groundedness..."):
+            result = pipeline.query(retrieval_query)
+
+        st.session_state.conversation.append({"question": followup, "result": result})
+        log_input("question", {
+            "question": followup,
+            "conversation_turn": len(st.session_state.conversation),
+            "abstained": result.abstained,
+            "answer": result.answer,
+        })
+        st.rerun()

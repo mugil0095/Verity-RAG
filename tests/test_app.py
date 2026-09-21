@@ -218,3 +218,38 @@ def test_llm_comparison_handles_failure_gracefully(monkeypatch):
     assert "Extractive (default)" in subheaders  # still rendered despite the LLM side failing
     error_messages = [e.value for e in at.error]
     assert any("LLM comparison unavailable" in msg for msg in error_messages)
+
+def test_conversation_tab_carries_context_into_retrieval():
+    """The actual point of this feature: a short, ambiguous follow-up
+    ('what about his early life?') should still retrieve Tesla-related
+    evidence because the prior question's text got prepended for
+    retrieval -- not because the follow-up alone is enough on its own."""
+    at = AppTest.from_file(str(APP_PATH))
+    at.run(timeout=30)
+    [b for b in at.sidebar.button if b.label == "Load corpus + train reranker"][0].click().run(timeout=60)
+    assert not at.exception, f"App crashed after loading corpus: {at.exception}"
+
+    assert at.chat_input, "No chat_input widget found on the Conversation tab"
+    at.chat_input[0].set_value("What is Nikola Tesla known for?").run(timeout=30)
+    assert not at.exception
+    assert len(at.session_state.conversation) == 1
+    assert at.session_state.conversation[0]["question"] == "What is Nikola Tesla known for?"
+
+    # A short, pronoun-heavy follow-up that wouldn't retrieve well alone
+    at.chat_input[0].set_value("What about his early life?").run(timeout=30)
+    assert not at.exception
+    assert len(at.session_state.conversation) == 2
+    assert at.session_state.conversation[1]["question"] == "What about his early life?"
+
+
+def test_conversation_new_conversation_button_clears_history():
+    at = AppTest.from_file(str(APP_PATH))
+    at.run(timeout=30)
+    [b for b in at.sidebar.button if b.label == "Load corpus + train reranker"][0].click().run(timeout=60)
+
+    at.chat_input[0].set_value("What is Nikola Tesla known for?").run(timeout=30)
+    assert len(at.session_state.conversation) == 1
+
+    new_conv_btn = [b for b in at.button if "New conversation" in b.label][0]
+    new_conv_btn.click().run(timeout=30)
+    assert at.session_state.conversation == []
