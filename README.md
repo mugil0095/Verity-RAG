@@ -42,11 +42,18 @@ flowchart TB
         gate -- "insufficient,\nsome signal" --> reformulate["Query Reformulation"]
         reformulate --> retrieve
         gate -- "insufficient,\nno signal" --> abstain1(["ABSTAIN"])
-        gate -- sufficient --> generate["Answer Generator\n(extractive / pluggable LLM)"]
+        gate -- sufficient --> ans{{"Answerability Gate\n(optional, learned)"}}
+        ans -- unanswerable --> abstain3(["ABSTAIN"])
+        ans -- answerable --> generate["Answer Generator\n(extractive / pluggable LLM)"]
         generate --> ground["Grounding Checker\n(claim decomposition)"]
         ground -- "below threshold" --> abstain2(["ABSTAIN"])
-        ground -- grounded --> answer(["Answer +\ngrounding report"])
+        ground -- grounded --> vg{{"Verity-Guard\n(optional, learned)"}}
+        vg -- unsupported --> abstain4(["ABSTAIN"])
+        vg -- supported --> answer(["Answer +\ngrounding report"])
     end
+
+    classDef opt stroke-dasharray: 5 5
+    class ans,vg opt
 ```
 
 | Layer | File | What it does |
