@@ -271,3 +271,62 @@ print(result.answer, result.grounding.overall_score, result.abstained)
 ## License
 
 MIT — see [LICENSE](LICENSE).
+## Verity-Guard: learned hallucination detector
+
+A 22M-parameter NLI cross-encoder (`cross-encoder/nli-deberta-v3-xsmall`) fine-tuned to score whether an answer is supported by its evidence. Trained 1 epoch on 10k examples (RAGTruth train + HaluEval QA, with sentence-style augmentation) on a GTX 1650 in ~35 min; evidence is trimmed to the sentences most relevant to the answer (`guard/ctx.py`). Evaluated on 3,700 held-out examples (RAGTruth official test + 20% of HaluEval questions), threshold chosen on validation. Latency = model call only, batch size 1.
+
+| Method | AUROC | F1 | Precision | Recall | ECE | RAGTruth F1 | HaluEval F1 | p50 ms | p95 ms |
+|---|---|---|---|---|---|---|---|---|---|
+| Heuristic grounding (original) | 0.635 | 0.572 | 0.490 | 0.688 | 0.200 | 0.609 | 0.445 | - | - |
+| Verity-Guard, int8 ONNX, CPU (4 threads) | 0.891 | 0.765 | 0.834 | 0.707 | 0.052 | 0.644 | 0.967 | 276.6 | 376.2 |
+| Verity-Guard, fp16, GPU (NVIDIA GeForce GTX 1650) | 0.898 | 0.773 | 0.791 | 0.756 | 0.061 | - | - | 77.9 | 84.2 |
+
+GPU batched throughput (batch 32): 20.0 answers/s. int8 model: 87.1 MB.
+
+**Fluent-sentence probe** (full-sentence answers, like the extractive generator's, built from held-out contexts; 463 cases): 0% of supported answers wrongly flagged, 99.2% of unsupported answers caught. This probe is built the same way as part of the training augmentation, so treat it as a regression check, not an independent benchmark.
+
+**Reading these numbers honestly**
+- AUROC 0.635 -> 0.89 and calibration (ECE) 0.20 -> 0.05 versus the original heuristic checker.
+- HaluEval is mostly synthetic, easy hallucinations; RAGTruth (real LLM outputs, subtle errors) is the meaningful benchmark: F1 0.61 -> 0.64.
+- The first model learned a shortcut (short answers = correct, fluent sentences = hallucinated). It was found by hand-testing and fixed with augmentation (`scripts/guard_train.py`); one true paraphrase is still wrongly flagged in manual checks.
+- Not yet tested on other domains. Wired into the agent and evaluated end to end on SQuAD below (including a negative result with a real LLM generator).
+- Reproduce: `scripts/guard_data.py`, `guard_baseline.py`, `guard_train.py`, `guard_export_onnx.py`, `guard_bench_live.py`, `guard_bench_gpu.py`, `guard_probe.py`. Serve via `verityrag.guard.LearnedGuard` or `python -m verityrag.mcp_server`.
+
+### Wiring the guard into the agent (`--guard`)
+
+`AgentController(answer_guard=LearnedGuard())` also scores each generated answer and abstains if it is judged unsupported (`abstain_reason="guard"`). SQuAD eval, same run, 75 answerable + 75 unanswerable test questions:
+
+| | Coverage | Wrong answers among attempted | Guard rate (unanswerable) | p50 latency |
+|---|---|---|---|---|
+| Without guard | 0.933 | 23 / 70 | 0.773 | 54 ms |
+| With guard | 0.933 | 23 / 70 | 0.773 | 311 ms |
+
+**Result: no change in accuracy, 6x slower.** With the default extractive generator every answer is a sentence copied from the evidence, so it is always "supported" and the guard never fires. The remaining errors are not unsupported claims but answers that do not address the question (retrieved, supported, irrelevant). The guard verifies support, not answerability. The next model to build is a question-answerability classifier (e.g. trained on SQuAD 2.0); the guard is most useful with an LLM generator, which can fabricate. Not yet tested with an LLM generator.
+
+### Answerability gate: fixes the real failure (`--answerability`)
+
+A second small model (same cross-encoder, trained on SQuAD 2.0 train, 12k examples, ~20 min on a GTX 1650) predicts whether the retrieved evidence can answer the question, and the agent abstains before generating if not (`abstain_reason="answerability"`). On SQuAD 2.0 validation (2,375 examples, articles disjoint from training): AUROC 0.948, F1 0.877; flags 100% of unrelated-evidence cases, 73% of adversarial unanswerable questions, and wrongly flags 10% of answerable ones.
+
+Verity-RAG SQuAD eval (75 answerable + 75 unanswerable), threshold sweep, same run each:
+
+| Answerability threshold | Coverage | Abstains on unanswerable | Correct answers | Wrong answers |
+|---|---|---|---|---|
+| off (baseline) | 0.933 | 0.773 | 47 | 23 |
+| 0.39 (F1-tuned on SQuAD 2.0) | 0.613 | 0.960 | 32 | 14 |
+| 0.65 | 0.680 | 0.947 | 35 | 16 |
+| **0.90** | **0.853** | **0.933** | **44** | **20** |
+| 0.98 | 0.907 | 0.893 | 46 | 22 |
+
+At 0.90 the system abstains correctly on 16 points more unanswerable questions (77% -> 93%) while giving up 8 points of coverage and 3 correct answers. Latency p50 rises from ~54 ms to ~190 ms (CPU, int8). Caveats: the 0.90 threshold was picked by looking at this eval (no separate held-out set for it), so the gain is likely somewhat optimistic; the eval set is small (150 questions); and the 20 remaining wrong answers are mostly retrieved-but-not-the-right-sentence errors, which a different model does not fix.
+
+### Learned guard with a real LLM generator: negative result
+
+Same SQuAD eval, but the generator is a real local LLM (Qwen2.5-0.5B-Instruct, GPU, no API key) so the guard sees genuine generations. 150 questions; "wrong" = gold answer string missing (a crude proxy that also counts correct paraphrases as wrong).
+
+| Config | Answered | Correct | Wrong | Abstains on unanswerable |
+|---|---|---|---|---|
+| LLM + heuristic grounding (baseline) | 58 | 42 | 16 | 90.7% |
+| + learned guard (default threshold) | 33 | 23 | 10 | 93.3% |
+| + guard + answerability (0.90) | 32 | 23 | 9 | 96.0% |
+
+The learned guard removes 19 correct answers to catch 6 wrong ones. Sweeping its threshold on the recorded scores does not rescue it: on the 58 answered questions its score separates "gold string missing" from "present" with AUROC 0.53, i.e. little better than chance on this distribution. It flags correct, fluent answers (e.g. "In July 1888, Tesla's motor and transformer designs were licensed to Westinghouse." scored 0.994) while also flagging some real problems (an answer that cites 565 °C for "what speed"). Likely cause: the guard was trained on 10k RAGTruth/HaluEval examples whose style differs from short LLM answers over retrieved SQuAD chunks. **Status: keep it experimental and off by default; the answerability gate is the part that helps.** A fix needs training data from this distribution (LLM answers over retrieved evidence with support labels).
