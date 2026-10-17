@@ -63,6 +63,8 @@ flowchart TB
 | Streaming | `streaming.py` | Background real-time ingestion |
 | Serving | `api.py`, `app.py` | FastAPI backend, Streamlit frontend |
 | Eval | `eval.py` | Full-corpus evaluation harness |
+| Guard (optional) | `guard/` | Learned hallucination detector + answerability gate (ONNX int8), off by default; see [Verity-Guard](#verity-guard-learned-hallucination-detector) |
+| MCP server (optional) | `mcp_server.py` | Exposes ingest / answer / verify_claim as MCP tools (`python -m verityrag.mcp_server`) |
 
 ## Evaluation data
 
