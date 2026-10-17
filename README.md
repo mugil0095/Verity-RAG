@@ -42,11 +42,18 @@ flowchart TB
         gate -- "insufficient,\nsome signal" --> reformulate["Query Reformulation"]
         reformulate --> retrieve
         gate -- "insufficient,\nno signal" --> abstain1(["ABSTAIN"])
-        gate -- sufficient --> generate["Answer Generator\n(extractive / pluggable LLM)"]
+        gate -- sufficient --> ans{{"Answerability Gate\n(optional, learned)"}}
+        ans -- unanswerable --> abstain3(["ABSTAIN"])
+        ans -- answerable --> generate["Answer Generator\n(extractive / pluggable LLM)"]
         generate --> ground["Grounding Checker\n(claim decomposition)"]
         ground -- "below threshold" --> abstain2(["ABSTAIN"])
-        ground -- grounded --> answer(["Answer +\ngrounding report"])
+        ground -- grounded --> vg{{"Verity-Guard\n(optional, learned)"}}
+        vg -- unsupported --> abstain4(["ABSTAIN"])
+        vg -- supported --> answer(["Answer +\ngrounding report"])
     end
+
+    classDef opt stroke-dasharray: 5 5
+    class ans,vg opt
 ```
 
 | Layer | File | What it does |
@@ -63,6 +70,8 @@ flowchart TB
 | Streaming | `streaming.py` | Background real-time ingestion |
 | Serving | `api.py`, `app.py` | FastAPI backend, Streamlit frontend |
 | Eval | `eval.py` | Full-corpus evaluation harness |
+| Guard (optional) | `guard/` | Learned hallucination detector + answerability gate (ONNX int8), off by default; see [Verity-Guard](#verity-guard-learned-hallucination-detector) |
+| MCP server (optional) | `mcp_server.py` | Exposes ingest / answer / verify_claim as MCP tools (`python -m verityrag.mcp_server`) |
 
 ## Evaluation data
 
@@ -221,7 +230,8 @@ Tracked as an actual backlog in [ROADMAP.md](ROADMAP.md).
   structural guarantee against hallucination — `LLMGenerator` swaps this
   for a real model when you want it.
 - **77.3% hallucination-guard rate by default, not 100%** — reported
-  honestly. A real embedder closes part of this gap at a real latency
+  honestly. The optional answerability gate raises it to 93.3% at the
+  cost of some coverage (see [Verity-Guard](#answerability-gate-fixes-the-real-failure---answerability)). A real embedder closes part of this gap at a real latency
   cost (see above).
 - **Streaming throughput** is bounded by the BM25 rebuild cost described
   above — fine for a trickle of documents, not bulk-loading thousands live.
@@ -268,9 +278,6 @@ result = pipeline.query("How does a steam engine work?")
 print(result.answer, result.grounding.overall_score, result.abstained)
 ```
 
-## License
-
-MIT — see [LICENSE](LICENSE).
 ## Verity-Guard: learned hallucination detector
 
 A 22M-parameter NLI cross-encoder (`cross-encoder/nli-deberta-v3-xsmall`) fine-tuned to score whether an answer is supported by its evidence. Trained 1 epoch on 10k examples (RAGTruth train + HaluEval QA, with sentence-style augmentation) on a GTX 1650 in ~35 min; evidence is trimmed to the sentences most relevant to the answer (`guard/ctx.py`). Evaluated on 3,700 held-out examples (RAGTruth official test + 20% of HaluEval questions), threshold chosen on validation. Latency = model call only, batch size 1.
@@ -291,6 +298,14 @@ GPU batched throughput (batch 32): 20.0 answers/s. int8 model: 87.1 MB.
 - The first model learned a shortcut (short answers = correct, fluent sentences = hallucinated). It was found by hand-testing and fixed with augmentation (`scripts/guard_train.py`); one true paraphrase is still wrongly flagged in manual checks.
 - Not yet tested on other domains. Wired into the agent and evaluated end to end on SQuAD below (including a negative result with a real LLM generator).
 - Reproduce: `scripts/guard_data.py`, `guard_baseline.py`, `guard_train.py`, `guard_export_onnx.py`, `guard_bench_live.py`, `guard_bench_gpu.py`, `guard_probe.py`. Serve via `verityrag.guard.LearnedGuard` or `python -m verityrag.mcp_server`.
+
+### Setup for the guard (optional)
+
+The guard and answerability gate are optional and off by default; the base pipeline needs none of this.
+
+- Extra dependencies: `pip install onnxruntime transformers` (plus `mcp` for the MCP server; `torch`, `datasets` only to retrain).
+- The trained model files are **not in this repo** (they are git-ignored under `guard_work/`). Rebuild them with the scripts in the order `guard_data.py` -> `guard_train.py` -> `guard_export_onnx.py` (guard) and `answer_data.py` -> `answer_train.py` (answerability), or point `VERITY_GUARD_DIR` / `VERITY_ANSWER_DIR` at existing model folders. Without them, `--guard` / `--answerability` fail at startup because the model files are missing.
+- Evaluate: `python -m verityrag.eval --guard` and `python -m verityrag.eval --answerability --answerability-threshold 0.90`.
 
 ### Wiring the guard into the agent (`--guard`)
 
@@ -330,3 +345,7 @@ Same SQuAD eval, but the generator is a real local LLM (Qwen2.5-0.5B-Instruct, G
 | + guard + answerability (0.90) | 32 | 23 | 9 | 96.0% |
 
 The learned guard removes 19 correct answers to catch 6 wrong ones. Sweeping its threshold on the recorded scores does not rescue it: on the 58 answered questions its score separates "gold string missing" from "present" with AUROC 0.53, i.e. little better than chance on this distribution. It flags correct, fluent answers (e.g. "In July 1888, Tesla's motor and transformer designs were licensed to Westinghouse." scored 0.994) while also flagging some real problems (an answer that cites 565 °C for "what speed"). Likely cause: the guard was trained on 10k RAGTruth/HaluEval examples whose style differs from short LLM answers over retrieved SQuAD chunks. **Status: keep it experimental and off by default; the answerability gate is the part that helps.** A fix needs training data from this distribution (LLM answers over retrieved evidence with support labels).
+
+## License
+
+MIT — see [LICENSE](LICENSE).
