@@ -60,3 +60,11 @@ A second, LLM-comparison-test failure couldn't be reproduced locally
 despite trying multiple `streamlit`/`google-genai` versions — made the
 tests more diagnostic and pinned both dependencies as a hardening
 measure, honestly not a confirmed fix for that specific failure.
+
+**2026-10-17** — Added Verity-Guard (optional, off by default): a learned
+hallucination detector (AUROC 0.635→0.891 on RAGTruth+HaluEval) and a
+SQuAD 2.0 answerability gate (unanswerable abstention 77%→93% at
+threshold 0.90, coverage 93%→85%). The learned guard did NOT help with a
+real LLM generator (AUROC 0.535), documented as a negative result.
+Open: the in-distribution retrain on LLM-generated answers was not
+finished; model weights are not published (rebuild via `scripts/`).
