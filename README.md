@@ -39,20 +39,20 @@ flowchart TB
         index -.read.-> retrieve
         retrieve --> rerank["LightGBM Reranker\n(ICT weak supervision)"]
         rerank --> gate{{"Sufficiency Gate\n(calibrated classifier)"}}
-        gate -- "insufficient,\nsome signal" --> reformulate["Query Reformulation"]
+        gate -- "insufficient,\nsome signal\n(up to 2 retries)" --> reformulate["Query Reformulation"]
         reformulate --> retrieve
-        gate -- "insufficient,\nno signal" --> abstain1(["ABSTAIN"])
-        gate -- sufficient --> ans{{"Answerability Gate\n(optional, learned)"}}
-        ans -- unanswerable --> abstain3(["ABSTAIN"])
+        gate -- "insufficient,\nno signal or\nout of retries" --> abstain1(["ABSTAIN\nsufficiency"])
+        gate -- sufficient --> ans{{"Answerability Gate\n(opt-in, learned)"}}
+        ans -- "can't answer" --> abstain3(["ABSTAIN\nanswerability"])
         ans -- answerable --> generate["Answer Generator\n(extractive / pluggable LLM)"]
         generate --> ground["Grounding Checker\n(claim decomposition)"]
-        ground -- "below threshold" --> abstain2(["ABSTAIN"])
-        ground -- grounded --> vg{{"Verity-Guard\n(optional, learned)"}}
-        vg -- unsupported --> abstain4(["ABSTAIN"])
-        vg -- supported --> answer(["Answer +\ngrounding report"])
+        ground -- "below threshold" --> abstain2(["ABSTAIN\ngrounding"])
+        ground -- grounded --> vg{{"Verity-Guard\n(opt-in, learned)"}}
+        vg -- unsupported --> abstain4(["ABSTAIN\nguard"])
+        vg -- "supported or\nuncertain" --> answer(["Answer +\ngrounding report"])
     end
 
-    classDef opt stroke-dasharray: 5 5
+    classDef opt stroke:#7c3aed,stroke-width:2px,stroke-dasharray: 5 5
     class ans,vg opt
 ```
 
