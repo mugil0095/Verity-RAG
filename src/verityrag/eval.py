@@ -97,7 +97,7 @@ def _split(items: list, calib_fraction: float, seed: int) -> tuple[list, list]:
 def run_eval(use_reranker: bool = True, calibrate: bool = True, verbose: bool = True,
              embedder: Embedder | None = None, generator: AnswerGenerator | None = None,
              lexical_index: LexicalIndex | None = None,
-             max_test_questions: int | None = None) -> dict:
+             max_test_questions: int | None = None, answer_guard=None, answerability=None) -> dict:
     """`embedder`: defaults to None, which lets VerityRAGPipeline use its own
     default (HashingEmbedder -- fast, no dependencies, no network). Pass an
     explicit embedder (e.g. SentenceTransformerEmbedder()) to evaluate real
@@ -150,7 +150,7 @@ def run_eval(use_reranker: bool = True, calibrate: bool = True, verbose: bool = 
         test_pos = test_pos[:max_test_questions]
         test_neg = test_neg[:max_test_questions]
 
-    pipeline = VerityRAGPipeline(embedder=embedder, generator=generator, lexical_index=lexical_index)
+    pipeline = VerityRAGPipeline(embedder=embedder, generator=generator, lexical_index=lexical_index, answer_guard=answer_guard, answerability=answerability)
 
     t0 = time.time()
     pipeline.ingest_documents(corpus)
@@ -178,12 +178,14 @@ def run_eval(use_reranker: bool = True, calibrate: bool = True, verbose: bool = 
 
     # ---- answerable TEST questions (disjoint from calibration set) ----
     attempted, wrongly_abstained, keyword_hits, grounding_scores, latencies = 0, 0, 0, [], []
+    reasons_pos, reasons_neg, guard_ms = {}, {}, []
     for item in test_pos:
         t0 = time.time()
         result = pipeline.query(item["question"])
         latencies.append(time.time() - t0)
         if result.abstained:
             wrongly_abstained += 1
+            reasons_pos[result.abstain_reason] = reasons_pos.get(result.abstain_reason, 0) + 1
             continue
         attempted += 1
         grounding_scores.append(result.grounding.overall_score)
@@ -196,6 +198,7 @@ def run_eval(use_reranker: bool = True, calibrate: bool = True, verbose: bool = 
         result = pipeline.query(item["question"])
         if result.abstained:
             correctly_abstained += 1
+            reasons_neg[result.abstain_reason] = reasons_neg.get(result.abstain_reason, 0) + 1
 
     report = {
         "embedder": type(pipeline.embedder).__name__,
@@ -214,6 +217,11 @@ def run_eval(use_reranker: bool = True, calibrate: bool = True, verbose: bool = 
                      "from a different embedder/generator run."}
             if max_test_questions is not None else None
         ),
+        "answer_guard": type(answer_guard).__name__ if answer_guard is not None else None,
+        "answerability": type(answerability).__name__ if answerability is not None else None,
+        "abstain_reasons_on_answerable": reasons_pos,
+        "abstain_reasons_on_unanswerable": reasons_neg,
+        "wrong_answers_among_attempted": attempted - keyword_hits,
         "attempted": attempted,
         "wrongly_abstained": wrongly_abstained,
         "coverage_rate": round(attempted / len(test_pos), 3) if test_pos else None,
@@ -263,6 +271,9 @@ if __name__ == "__main__":
              "swap changes any eval numbers (it shouldn't -- BM25-family scoring "
              "either way).",
     )
+    parser.add_argument("--guard", action="store_true", help="Also abstain when the learned Verity-Guard model flags the generated answer as unsupported.")
+    parser.add_argument("--answerability", action="store_true", help="Also abstain when the learned answerability model says the evidence cannot answer the question.")
+    parser.add_argument("--answerability-threshold", type=float, default=None, help="Override the answerability threshold (higher = fewer refusals).")
     args = parser.parse_args()
 
     chosen_embedder = None
@@ -285,5 +296,15 @@ if __name__ == "__main__":
         from .llm_providers import gemini_complete_fn
         chosen_generator = LLMGenerator(complete_fn=gemini_complete_fn)
 
-    run_eval(embedder=chosen_embedder, generator=chosen_generator, lexical_index=chosen_lexical_index,
+    chosen_guard = None
+    if args.guard:
+        from .guard import LearnedGuard
+        chosen_guard = LearnedGuard()
+
+    chosen_answerability = None
+    if args.answerability:
+        from .guard import AnswerabilityGate
+        chosen_answerability = AnswerabilityGate(threshold=args.answerability_threshold)
+
+    run_eval(answerability=chosen_answerability, answer_guard=chosen_guard, embedder=chosen_embedder, generator=chosen_generator, lexical_index=chosen_lexical_index,
              max_test_questions=args.max_test_questions)

@@ -62,6 +62,9 @@ class AgentResult:
     # when factually correct)? `answer` alone can't distinguish these --
     # both look identical (None) from the outside.
     raw_generated_text: str | None = None
+    # Why the agent abstained: "sufficiency" | "grounding" | "guard" (None when it answered).
+    abstain_reason: str | None = None
+    guard_p_hallucinated: float | None = None
 
 
 class AgentController:
@@ -76,7 +79,15 @@ class AgentController:
         grounding_abstain_threshold: float = 0.5,
         top_k: int = 6,
         min_confidence_to_reformulate: float = 0.3,
+        answer_guard=None,
+        answerability=None,
     ):
+        # Optional learned hallucination detector (guard.LearnedGuard). When set, an answer that
+        # passes the heuristic grounding check is also scored by it; "unsupported" -> abstain.
+        self.answer_guard = answer_guard
+        # Optional learned answerability gate (guard.AnswerabilityGate): even when retrieval looks sufficient,
+        # abstain if the model judges the question unanswerable from this evidence.
+        self.answerability = answerability
         self.index = index
         self.embedder = embedder
         self.generator = generator
@@ -110,6 +121,7 @@ class AgentController:
         best_candidates: list[RetrievedChunk] = []
         best_top_score = -1.0
         ever_sufficient = False
+        blocked_by_answerability = False
 
         for hop in range(self.max_hops + 1):
             candidates = self._retrieve_and_rerank(current_query)
@@ -126,6 +138,9 @@ class AgentController:
             # score; swap in a CalibratedSufficiencyGate (sufficiency.py) once
             # labeled calibration data is available -- see pipeline.calibrate_sufficiency().
             sufficient = self.sufficiency_gate.is_sufficient(candidates)
+            if sufficient and self.answerability is not None and not self.answerability.is_answerable(query, candidates):
+                blocked_by_answerability = True
+                break
             if sufficient:
                 ever_sufficient = True
                 break
@@ -150,7 +165,8 @@ class AgentController:
             trace.append(AgentStep(hop=len(trace), query_used=current_query, n_candidates=0,
                                     top_score=best_top_score, action="abstain"))
             return AgentResult(query=query, answer=None, grounding=None, evidence=best_candidates,
-                                hops_used=len(trace), abstained=True, trace=trace)
+                                hops_used=len(trace), abstained=True, trace=trace,
+                                abstain_reason="answerability" if blocked_by_answerability else "sufficiency")
 
         generated: GeneratedAnswer = self.generator.generate(query, best_candidates, self.embedder)
         trace.append(AgentStep(hop=len(trace), query_used=current_query,
@@ -164,10 +180,23 @@ class AgentController:
                                     top_score=0.0, action="abstain"))
             return AgentResult(query=query, answer=None, grounding=report, evidence=best_candidates,
                                 hops_used=len(trace), abstained=True, trace=trace,
-                                raw_generated_text=generated.text)
+                                raw_generated_text=generated.text, abstain_reason="grounding")
+
+        guard_p = None
+        if self.answer_guard is not None:
+            gv = self.answer_guard.score(generated.text, best_candidates, query)
+            guard_p = gv.p_hallucinated
+            if gv.verdict == "unsupported":
+                trace.append(AgentStep(hop=len(trace), query_used=current_query, n_candidates=0,
+                                        top_score=0.0, action="abstain"))
+                return AgentResult(query=query, answer=None, grounding=report, evidence=best_candidates,
+                                    hops_used=len(trace), abstained=True, trace=trace,
+                                    raw_generated_text=generated.text, abstain_reason="guard",
+                                    guard_p_hallucinated=guard_p)
 
         trace.append(AgentStep(hop=len(trace), query_used=current_query, n_candidates=0,
                                 top_score=0.0, action="answer"))
         return AgentResult(query=query, answer=generated.text, grounding=report,
                             evidence=best_candidates, hops_used=len(trace),
-                            abstained=False, trace=trace, raw_generated_text=generated.text)
+                            abstained=False, trace=trace, raw_generated_text=generated.text,
+                            guard_p_hallucinated=guard_p)

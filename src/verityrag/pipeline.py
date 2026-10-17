@@ -32,6 +32,8 @@ class VerityRAGPipeline:
         generator: AnswerGenerator | None = None,
         lexical_index: LexicalIndex | None = None,
         max_hops: int = 2,
+        answer_guard=None,
+        answerability=None,
     ):
         self.embedder = embedder or HashingEmbedder()
         self.index = LiveIndex(self.embedder, lexical_index=lexical_index)
@@ -43,6 +45,8 @@ class VerityRAGPipeline:
             generator=self.generator,
             reranker_model=None,
             max_hops=max_hops,
+            answer_guard=answer_guard,
+            answerability=answerability,
         )
 
     def ingest_document(self, doc_id: str, title: str, text: str) -> int:
