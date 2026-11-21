@@ -14,12 +14,24 @@ useful for calling /ingest and /query by hand without curl/Postman.
 """
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .pipeline import VerityRAGPipeline
 
 app = FastAPI(title="VerityRAG", version="0.1.0")
+# Browser front ends call this API cross-origin (the React dev server runs on :5173).
+# Set VERITYRAG_CORS_ORIGINS to a comma-separated list to allow other origins.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in os.environ.get(
+        "VERITYRAG_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",") if o.strip()],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 pipeline = VerityRAGPipeline()
 
 
@@ -40,6 +52,34 @@ class ClaimOut(BaseModel):
     is_grounded: bool
 
 
+class StepOut(BaseModel):
+    hop: int
+    query_used: str
+    n_candidates: int
+    top_score: float
+    action: str
+
+
+class EvidenceOut(BaseModel):
+    chunk_id: str
+    doc_id: str
+    title: str
+    text: str
+    dense_score: float
+
+
+class PartOut(BaseModel):
+    """One sub-question of a compound question and what each agent did with it."""
+    sub_question: str
+    answer: str | None
+    abstained: bool
+    abstain_reason: str | None
+    grounding_score: float | None
+    evidence_chunk_ids: list[str]
+    retriever_steps: list[StepOut]
+    verifier_steps: list[StepOut]
+
+
 class QueryResponse(BaseModel):
     question: str
     answer: str | None
@@ -49,6 +89,18 @@ class QueryResponse(BaseModel):
     claims: list[ClaimOut]
     evidence_chunk_ids: list[str]
     hops_used: int
+    # Which layer refused ("sufficiency" | "answerability" | "grounding" | "guard"), else null.
+    abstain_reason: str | None = None
+    # Sub-questions the planner found (empty for a single question) and per-part detail.
+    plan: list[str] = Field(default_factory=list)
+    parts: list[PartOut] = Field(default_factory=list)
+    trace: list[StepOut] = Field(default_factory=list)
+    evidence: list[EvidenceOut] = Field(default_factory=list)
+
+
+def _step(s) -> StepOut:
+    return StepOut(hop=s.hop, query_used=s.query_used, n_candidates=s.n_candidates,
+                   top_score=s.top_score, action=s.action)
 
 
 @app.get("/")
@@ -96,6 +148,19 @@ def query(req: QueryRequest):
         claims=claims,
         evidence_chunk_ids=[e.chunk_id for e in result.evidence],
         hops_used=result.hops_used,
+        abstain_reason=result.abstain_reason,
+        plan=list(getattr(result, "plan", [])),
+        parts=[
+            PartOut(sub_question=p.sub_question, answer=p.answer, abstained=p.abstained,
+                    abstain_reason=p.abstain_reason, grounding_score=p.grounding_score,
+                    evidence_chunk_ids=p.evidence_chunk_ids,
+                    retriever_steps=[_step(s) for s in p.retriever_steps],
+                    verifier_steps=[_step(s) for s in p.verifier_steps])
+            for p in getattr(result, "parts", [])
+        ],
+        trace=[_step(s) for s in result.trace],
+        evidence=[EvidenceOut(chunk_id=e.chunk_id, doc_id=e.doc_id, title=e.title,
+                              text=e.text, dense_score=e.dense_score) for e in result.evidence],
     )
 
 

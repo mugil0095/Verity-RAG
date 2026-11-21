@@ -116,6 +116,15 @@ class AgentController:
         return candidates
 
     def answer(self, query: str) -> AgentResult:
+        """The single-agent path: retrieve, then respond. MultiAgentController
+        (multi_agent.py) calls this for any question the planner leaves whole,
+        so those questions behave exactly as before the split."""
+        return self.respond(query, self.retrieve(query))
+
+    def retrieve(self, query: str) -> "Retrieval":
+        """Retriever role: hybrid retrieval + rerank + sufficiency gate, with
+        bounded pseudo-relevance-feedback reformulation between hops. Hands
+        the best evidence found, and whether it cleared the gate, to respond()."""
         trace: list[AgentStep] = []
         current_query = query
         best_candidates: list[RetrievedChunk] = []
@@ -157,16 +166,29 @@ class AgentController:
             trace.append(AgentStep(hop=hop, query_used=current_query, n_candidates=0,
                                     top_score=0.0, action="reformulate"))
 
+        return Retrieval(candidates=best_candidates, sufficient=ever_sufficient,
+                         blocked_by_answerability=blocked_by_answerability,
+                         last_query=current_query, best_top_score=best_top_score, trace=trace)
+
+    def respond(self, query: str, retrieval: "Retrieval") -> AgentResult:
+        """Verifier role: refuse when retrieval never cleared the gate,
+        otherwise generate from the evidence and check the result (claim-level
+        grounding, then the optional learned guard). Abstains instead of
+        returning anything that fails a check."""
+        trace = retrieval.trace
+        current_query = retrieval.last_query
+        best_candidates = retrieval.candidates
+
         # Retrieval never found evidence clearing the sufficiency bar in any hop:
         # abstain now rather than generate an answer grounded in noise. This is
         # the primary defense against out-of-domain questions (see
         # test_agent_abstains_when_no_relevant_evidence_exists).
-        if not ever_sufficient:
+        if not retrieval.sufficient:
             trace.append(AgentStep(hop=len(trace), query_used=current_query, n_candidates=0,
-                                    top_score=best_top_score, action="abstain"))
+                                    top_score=retrieval.best_top_score, action="abstain"))
             return AgentResult(query=query, answer=None, grounding=None, evidence=best_candidates,
                                 hops_used=len(trace), abstained=True, trace=trace,
-                                abstain_reason="answerability" if blocked_by_answerability else "sufficiency")
+                                abstain_reason="answerability" if retrieval.blocked_by_answerability else "sufficiency")
 
         generated: GeneratedAnswer = self.generator.generate(query, best_candidates, self.embedder)
         trace.append(AgentStep(hop=len(trace), query_used=current_query,
@@ -200,3 +222,15 @@ class AgentController:
                             evidence=best_candidates, hops_used=len(trace),
                             abstained=False, trace=trace, raw_generated_text=generated.text,
                             guard_p_hallucinated=guard_p)
+
+
+@dataclass
+class Retrieval:
+    """What the retriever role hands to the verifier role: the best evidence
+    found, whether it cleared the sufficiency gate, and the trace so far."""
+    candidates: list[RetrievedChunk]
+    sufficient: bool
+    blocked_by_answerability: bool
+    last_query: str       # query text of the final hop (after any reformulation)
+    best_top_score: float
+    trace: list[AgentStep]
