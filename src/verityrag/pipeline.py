@@ -20,6 +20,7 @@ from .chunking import chunk_document
 from .embedding import Embedder, HashingEmbedder
 from .generation import AnswerGenerator, ExtractiveGenerator
 from .indexing import LexicalIndex, LiveIndex
+from .multi_agent import MultiAgentController
 from .reranker import generate_ict_training_data, train_reranker
 from .retrieval import hybrid_retrieve
 from .sufficiency import CalibrationExample, extract_features, train_sufficiency_gate
@@ -34,6 +35,7 @@ class VerityRAGPipeline:
         max_hops: int = 2,
         answer_guard=None,
         answerability=None,
+        multi_agent: bool = True,
     ):
         self.embedder = embedder or HashingEmbedder()
         self.index = LiveIndex(self.embedder, lexical_index=lexical_index)
@@ -48,6 +50,10 @@ class VerityRAGPipeline:
             answer_guard=answer_guard,
             answerability=answerability,
         )
+        # Planner -> retriever -> verifier (multi_agent.py). Questions the planner
+        # leaves whole take the single-agent path unchanged; False forces it for all.
+        self.multi_agent = multi_agent
+        self.coordinator = MultiAgentController(self.agent)
 
     def ingest_document(self, doc_id: str, title: str, text: str) -> int:
         """Real-time ingestion path: chunk -> embed -> add to live index
@@ -119,4 +125,6 @@ class VerityRAGPipeline:
         return True
 
     def query(self, question: str) -> AgentResult:
+        if self.multi_agent:
+            return self.coordinator.answer(question)
         return self.agent.answer(question)
